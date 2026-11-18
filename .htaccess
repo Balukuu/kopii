@@ -1,0 +1,56 @@
+# Kopii Marketplace — LiteSpeed & Apache Configuration
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block direct web access to private application directories
+    RewriteRule ^(app|database|storage)(/|$) - [F,L]
+
+    # Force HTTPS in production (skip on localhost / local dev).
+    # Also treat the request as secure when a proxy or CDN already terminated TLS and forwarded
+    # plain HTTP to us (Cloudflare, load balancers, cPanel proxies; all send X-Forwarded-Proto)
+    # -- otherwise the redirect fires on every request and the browser reports "too many redirects".
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{SERVER_PORT} !^443$
+    RewriteCond %{HTTP:X-Forwarded-Proto} !^https$ [NC]
+    RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:\d+)?$ [NC]
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Serve existing static files (assets, uploads, install.php) directly
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Route everything else through the front controller
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Never serve documentation, database dumps, logs, databases or backups, wherever they sit
+<FilesMatch "\.(md|sql|sqlite|sqlite3|db|log|lock|bak|old|orig|tgz|tar|gz|zip)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Static Asset Caching on LiteSpeed / Apache
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+</IfModule>
