@@ -58,16 +58,62 @@ class ReviewModel
         return (bool) $stmt->fetchColumn();
     }
 
-    /** Reviews for the admin console: waiting ones first, then newest. */
-    public static function adminList(int $limit = 100): array
+    /**
+     * Reviews for the admin console, waiting ones first, then newest.
+     *
+     * @param string $status 'pending', 'published', or '' for all
+     */
+    public static function adminSearch(string $status, int $limit, int $offset): array
     {
-        $sql = "
-            SELECT r.*, p.business_name, p.slug AS provider_slug
-            FROM reviews r
-            INNER JOIN providers p ON p.id = r.provider_id
-            ORDER BY CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END ASC, r.id DESC
-            LIMIT " . max(1, $limit);
-        return Database::connection()->query($sql)->fetchAll();
+        $params = [];
+        $where  = self::adminWhere($status, $params);
+
+        $stmt = Database::connection()->prepare(
+            'SELECT r.*, p.business_name, p.slug AS provider_slug,
+                    u.email AS reviewer_email, u.email_verified_at AS reviewer_email_verified_at
+             FROM reviews r
+             INNER JOIN providers p ON p.id = r.provider_id
+             LEFT JOIN users u ON u.id = r.reviewer_user_id
+             WHERE ' . $where . "
+             ORDER BY CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END ASC, r.id DESC
+             LIMIT " . max(1, $limit) . ' OFFSET ' . max(0, $offset)
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public static function adminCount(string $status): int
+    {
+        $params = [];
+        $where  = self::adminWhere($status, $params);
+
+        $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM reviews r WHERE ' . $where);
+        $stmt->execute($params);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** One review with its provider's name, for moderation and the audit log. */
+    public static function findForAdmin(int $reviewId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT r.*, p.business_name, p.slug AS provider_slug
+             FROM reviews r
+             INNER JOIN providers p ON p.id = r.provider_id
+             WHERE r.id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $reviewId]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    private static function adminWhere(string $status, array &$params): string
+    {
+        if ($status === self::PENDING || $status === self::PUBLISHED) {
+            $params[':status'] = $status;
+            return 'r.status = :status';
+        }
+        return '1 = 1';
     }
 
     public static function pendingCount(): int

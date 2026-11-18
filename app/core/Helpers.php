@@ -190,9 +190,18 @@ function asset_url(string $path): string
  */
 function redirect_to(string $path, array $query = []): never
 {
-    $target = (str_starts_with($path, 'http://') || str_starts_with($path, 'https://'))
-        ? $path
-        : route_url($path, $query);
+    if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+        $target = $path;
+    } else {
+        // "/admin/reviews#waiting" keeps the part after # as a page anchor.
+        $fragment = '';
+        if (str_contains($path, '#')) {
+            [$path, $anchor] = explode('#', $path, 2);
+            $anchor   = (string) preg_replace('/[^A-Za-z0-9_-]/', '', $anchor);
+            $fragment = $anchor !== '' ? '#' . $anchor : '';
+        }
+        $target = route_url($path, $query) . $fragment;
+    }
     header('Location: ' . $target, true, 302);
     exit;
 }
@@ -392,6 +401,110 @@ function require_admin(): array
         exit('Access restricted to Kopii administrators.');
     }
     return $user;
+}
+
+/**
+ * Re-check the signed-in account against the database on every request. The session holds a copy of
+ * the account (name, role), so without this a suspended user would stay signed in until their
+ * session expired, and a role change would not apply until the next login.
+ */
+function refresh_session_user(): void
+{
+    if (!is_logged_in()) {
+        return;
+    }
+
+    try {
+        $row = UserModel::findById((int) $_SESSION['user']['id']);
+    } catch (Throwable $e) {
+        // Do not lock everyone out because of a database hiccup; the page itself will report it.
+        report_exception($e);
+        return;
+    }
+
+    if ($row === null || !empty($row['suspended_at'])) {
+        $suspended = $row !== null;
+        unset($_SESSION['user']);
+        session_regenerate_id(true);
+        if ($suspended) {
+            flash('error', 'This account has been suspended. Please contact the Kopii team if you think that is a mistake.');
+        }
+        return;
+    }
+
+    $_SESSION['user']['role']      = (string) $row['role'];
+    $_SESSION['user']['full_name'] = (string) $row['full_name'];
+    $_SESSION['user']['email']     = (string) $row['email'];
+}
+
+/** The current admin page (path + query, without the site's base path), for "come back here" form fields. */
+function admin_current_path(): string
+{
+    $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/admin'), PHP_URL_PATH) ?? '/admin');
+    $base = base_path();
+    if ($base !== '' && str_starts_with($path, $base)) {
+        $path = substr($path, strlen($base));
+    }
+    if (!str_starts_with($path, '/admin')) {
+        return '/admin';
+    }
+    $query = (string) ($_SERVER['QUERY_STRING'] ?? '');
+    return $path . ($query !== '' ? '?' . $query : '');
+}
+
+function admin_return_field(): string
+{
+    return '<input type="hidden" name="return" value="' . e(admin_current_path()) . '">';
+}
+
+/**
+ * Send the admin back to the page a form came from. Only pages inside /admin are accepted, so the
+ * hidden field cannot be used to bounce someone to another site.
+ */
+function admin_redirect_back(string $fallback = '/admin'): never
+{
+    $raw = (string) ($_POST['return'] ?? '');
+    if (!preg_match('#^/admin(/[A-Za-z0-9_-]+)*(\?[A-Za-z0-9_=&%.+-]*)?(\#[A-Za-z0-9_-]+)?$#', $raw)) {
+        $raw = $fallback;
+    }
+
+    $fragment = '';
+    if (str_contains($raw, '#')) {
+        [$raw, $anchor] = explode('#', $raw, 2);
+        $fragment = '#' . $anchor;
+    }
+    $query = [];
+    if (str_contains($raw, '?')) {
+        [$raw, $queryString] = explode('?', $raw, 2);
+        parse_str($queryString, $query);
+    }
+
+    redirect_to($raw . $fragment, $query);
+}
+
+/** What is waiting for an administrator's decision. Looked up once per request, however many places show it. */
+function admin_attention_counts(): array
+{
+    static $counts = null;
+    if ($counts === null) {
+        try {
+            $counts = AdminModel::attentionCounts();
+        } catch (Throwable $e) {
+            report_exception($e);
+            $counts = ['pending_reviews' => 0, 'unverified_providers' => 0, 'unconfirmed_emails' => 0];
+        }
+    }
+    return $counts;
+}
+
+/**
+ * The number on the nav badge: reviews waiting for approval. Listings without the Verified badge are
+ * deliberately not counted: anyone can list for free, so most listings start unverified and the
+ * badge would never clear. They are shown on the admin overview instead.
+ */
+function admin_attention_total(): int
+{
+    return (int) admin_attention_counts()['pending_reviews'];
 }
 
 /**

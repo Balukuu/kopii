@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `role` VARCHAR(20) NOT NULL DEFAULT 'provider',
     `avatar_path` VARCHAR(255) DEFAULT NULL,
     `email_verified_at` DATETIME DEFAULT NULL,
+    `suspended_at` DATETIME DEFAULT NULL,
     `created_at` DATETIME NOT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_users_email` (`email`),
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS `providers` (
     `avatar_path` VARCHAR(255) DEFAULT NULL,
     `cover_path` VARCHAR(255) DEFAULT NULL,
     `is_verified` TINYINT(1) NOT NULL DEFAULT 0,
+    `verified_at` DATETIME DEFAULT NULL,
+    `verified_by` INT UNSIGNED DEFAULT NULL,
     `is_featured` TINYINT(1) NOT NULL DEFAULT 0,
     `is_available` TINYINT(1) NOT NULL DEFAULT 1,
     `status` VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -175,6 +178,23 @@ CREATE TABLE IF NOT EXISTS `email_verifications` (
     UNIQUE KEY `uq_email_verifications_token` (`token_hash`),
     KEY `idx_email_verifications_user` (`user_id`, `created_at`),
     CONSTRAINT `fk_email_verifications_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Every action an administrator takes (verify, pause, suspend, delete a review...). `target_label` is a
+-- snapshot of the name at the time, so the record still reads properly after the target is deleted.
+CREATE TABLE IF NOT EXISTS `admin_log` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `admin_user_id` INT UNSIGNED DEFAULT NULL,
+    `action` VARCHAR(40) NOT NULL,
+    `target_type` VARCHAR(20) NOT NULL,
+    `target_id` INT UNSIGNED DEFAULT NULL,
+    `target_label` VARCHAR(190) NOT NULL DEFAULT '',
+    `note` VARCHAR(500) NOT NULL DEFAULT '',
+    `created_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_admin_log_created` (`created_at`),
+    KEY `idx_admin_log_target` (`target_type`, `target_id`),
+    CONSTRAINT `fk_admin_log_user` FOREIGN KEY (`admin_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -650,38 +650,43 @@ class ProviderModel
         return array_slice($scored, 0, max(1, $limit));
     }
 
-    public static function adminAllProviders(): array
+    // Admin actions set an explicit state instead of flipping the current one, so a stale page or a
+    // double-click can never undo what the admin meant to do.
+
+    /** Give or take away the Verified badge, recording who did it and when. */
+    public static function adminSetVerified(int $providerId, bool $verified, int $adminUserId): void
     {
-        $pdo = Database::connection();
-        $sql = "
-            SELECT p.*, u.email AS owner_email, u.full_name AS owner_name, c.name AS category_name,
-                   COUNT(DISTINCT pi.id) AS portfolio_count,
-                   COUNT(DISTINCT i.id) AS inquiry_count
-            FROM providers p
-            INNER JOIN users u ON u.id = p.user_id
-            INNER JOIN categories c ON c.id = p.category_id
-            LEFT JOIN portfolio_items pi ON pi.provider_id = p.id
-            LEFT JOIN inquiries i ON i.provider_id = p.id
-            GROUP BY p.id, u.email, u.full_name, c.name
-            ORDER BY p.id DESC
-        ";
-        return $pdo->query($sql)->fetchAll();
+        $now  = date('Y-m-d H:i:s');
+        $stmt = Database::connection()->prepare(
+            'UPDATE providers SET is_verified = :v, verified_at = :at, verified_by = :by, updated_at = :u WHERE id = :id'
+        );
+        $stmt->execute([
+            ':v'  => $verified ? 1 : 0,
+            ':at' => $verified ? $now : null,
+            ':by' => $verified ? $adminUserId : null,
+            ':u'  => $now,
+            ':id' => $providerId,
+        ]);
     }
 
-    public static function adminToggleFlag(int $providerId, string $field): void
+    public static function adminSetFeatured(int $providerId, bool $featured): void
     {
-        if (!in_array($field, ['is_verified', 'is_featured'], true)) {
+        $stmt = Database::connection()->prepare('UPDATE providers SET is_featured = :f, updated_at = :u WHERE id = :id');
+        $stmt->execute([':f' => $featured ? 1 : 0, ':u' => date('Y-m-d H:i:s'), ':id' => $providerId]);
+    }
+
+    /**
+     * Make a listing public ('active') or hide it ('paused'). A 'suspended' listing belongs to a
+     * suspended account and is left alone: reinstate the account instead.
+     */
+    public static function adminSetStatus(int $providerId, string $status): void
+    {
+        if (!in_array($status, ['active', 'paused'], true)) {
             return;
         }
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare("UPDATE providers SET {$field} = CASE WHEN {$field} = 1 THEN 0 ELSE 1 END, updated_at = :u WHERE id = :id");
-        $stmt->execute([':u' => date('Y-m-d H:i:s'), ':id' => $providerId]);
-    }
-
-    public static function adminToggleStatus(int $providerId): void
-    {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare("UPDATE providers SET status = CASE WHEN status = 'active' THEN 'paused' ELSE 'active' END, updated_at = :u WHERE id = :id");
-        $stmt->execute([':u' => date('Y-m-d H:i:s'), ':id' => $providerId]);
+        $stmt = Database::connection()->prepare(
+            "UPDATE providers SET status = :s, updated_at = :u WHERE id = :id AND status <> 'suspended'"
+        );
+        $stmt->execute([':s' => $status, ':u' => date('Y-m-d H:i:s'), ':id' => $providerId]);
     }
 }

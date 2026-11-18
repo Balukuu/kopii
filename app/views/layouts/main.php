@@ -58,8 +58,11 @@ $curRoute = $currentRoute ?? '/';
 
                     <?php if ($authUser): ?>
                         <?php if (($authUser['role'] ?? '') === 'admin'): ?>
+                            <?php $adminTodo = admin_attention_total(); ?>
                             <li>
-                                <a class="nav-link" href="<?= e(route_url('/admin')) ?>"<?= $curRoute === '/admin' ? ' aria-current="page"' : '' ?>>Admin</a>
+                                <a class="nav-link" href="<?= e(route_url('/admin')) ?>"<?= str_starts_with($curRoute, '/admin') ? ' aria-current="page"' : '' ?>>
+                                    Admin<?php if ($adminTodo > 0): ?><span class="nav-badge tnum" role="img" aria-label="<?= (int) $adminTodo ?> items need attention"><?= $adminTodo > 99 ? '99+' : (int) $adminTodo ?></span><?php endif; ?>
+                                </a>
                             </li>
                         <?php endif; ?>
                         <li>

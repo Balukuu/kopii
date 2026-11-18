@@ -1,170 +1,99 @@
 <?php
 defined('KOPII_APP') or exit('Direct access denied.');
+/**
+ * @var array $attention pending_reviews, unverified_providers, unconfirmed_emails
+ * @var array $week      accounts, listings, inquiries, reviews (last 7 days)
+ * @var array $stats     providers, portfolios, cities, reviews
+ * @var int   $hidden    listings that are not public
+ * @var array $recent    latest admin_log rows
+ */
+View::partial('admin_header', ['adminTab' => $adminTab]);
+$allClear = (int) $attention['pending_reviews'] === 0 && (int) $attention['unverified_providers'] === 0;
 ?>
-<section class="dash-header">
-    <div class="container">
-        <span class="badge badge-featured" style="margin-block-end:0.4rem;"><?= svg_icon('shield', 16) ?> Platform Administration</span>
-        <h1 style="margin:0; color:#fff; font-size:1.85rem;">Kopii Marketplace Moderation</h1>
-        <p style="margin:0.3rem 0 0; color:#cbd5e1;">Verify trusted Ugandan freelancers &amp; businesses, manage featured placements, and monitor activity.</p>
-    </div>
-</section>
-
 <section class="section-pad-sm">
     <div class="container">
+        <h2 class="admin-section-title">Needs your attention</h2>
+
+        <?php if ($allClear): ?>
+            <p class="all-clear"><?= svg_icon('check', 16) ?> You are all caught up: no reviews are waiting and every live listing is Verified.</p>
+        <?php endif; ?>
+
+        <div class="attention-grid">
+            <a class="attention-card<?= (int) $attention['pending_reviews'] > 0 ? ' is-urgent' : '' ?>" href="<?= e(route_url('/admin/reviews', ['status' => 'pending'])) ?>">
+                <span class="attention-label">Reviews waiting</span>
+                <strong class="tnum"><?= (int) $attention['pending_reviews'] ?></strong>
+                <span class="attention-hint">Not public, and not counted in ratings, until you approve them.</span>
+            </a>
+            <a class="attention-card<?= (int) $attention['unverified_providers'] > 0 ? ' is-urgent' : '' ?>" href="<?= e(route_url('/admin/providers', ['status' => 'active', 'verified' => '0'])) ?>">
+                <span class="attention-label">Listings to verify</span>
+                <strong class="tnum"><?= (int) $attention['unverified_providers'] ?></strong>
+                <span class="attention-hint">Live listings that do not have the Verified badge yet.</span>
+            </a>
+            <a class="attention-card" href="<?= e(route_url('/admin/users', ['email' => 'unconfirmed'])) ?>">
+                <span class="attention-label">Emails to confirm</span>
+                <strong class="tnum"><?= (int) $attention['unconfirmed_emails'] ?></strong>
+                <span class="attention-hint">Accounts that have not confirmed their address. You can resend the link.</span>
+            </a>
+        </div>
+
+        <h2 class="admin-section-title">Last 7 days</h2>
         <div class="kpi-grid">
             <div class="kpi-card">
-                <span>Active Providers</span>
+                <span>New accounts</span>
+                <strong class="tnum"><?= (int) $week['accounts'] ?></strong>
+            </div>
+            <div class="kpi-card">
+                <span>New listings</span>
+                <strong class="tnum"><?= (int) $week['listings'] ?></strong>
+            </div>
+            <div class="kpi-card">
+                <span>Quote requests</span>
+                <strong class="tnum"><?= (int) $week['inquiries'] ?></strong>
+            </div>
+            <div class="kpi-card">
+                <span>New reviews</span>
+                <strong class="tnum"><?= (int) $week['reviews'] ?></strong>
+            </div>
+        </div>
+
+        <h2 class="admin-section-title">Marketplace</h2>
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <span>Live listings</span>
                 <strong class="tnum"><?= (int) $stats['providers'] ?></strong>
             </div>
             <div class="kpi-card">
-                <span>Portfolio Items</span>
+                <span>Hidden listings</span>
+                <strong class="tnum"><?= (int) $hidden ?></strong>
+            </div>
+            <div class="kpi-card">
+                <span>Portfolio items</span>
                 <strong class="tnum"><?= (int) $stats['portfolios'] ?></strong>
             </div>
             <div class="kpi-card">
-                <span>Ugandan Cities</span>
-                <strong class="tnum"><?= (int) $stats['cities'] ?></strong>
-            </div>
-            <div class="kpi-card">
-                <span>Published Reviews</span>
+                <span>Published reviews</span>
                 <strong class="tnum"><?= (int) $stats['reviews'] ?></strong>
             </div>
         </div>
 
-        <h2 class="m-0" style="margin-block-end:1rem;">Providers</h2>
-        <div class="table-scroll">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th scope="col">Business / Freelancer</th>
-                        <th scope="col">Category &amp; City</th>
-                        <th scope="col">Work / Leads</th>
-                        <th scope="col">Badges &amp; Status</th>
-                        <th scope="col">Moderation Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($providers as $p): ?>
-                        <tr>
-                            <td>
-                                <a href="<?= e(route_url('/provider/' . $p['slug'])) ?>"><strong><?= e($p['business_name']) ?></strong></a>
-                                <div class="text-muted" style="font-size:0.8rem;"><?= e($p['owner_name']) ?> &middot; <?= e($p['owner_email']) ?></div>
-                            </td>
-                            <td>
-                                <?= e($p['category_name']) ?>
-                                <div class="text-muted" style="font-size:0.8rem;"><?= e($p['city']) ?> &middot; <?= e(format_ugx($p['starting_price_ugx'])) ?></div>
-                            </td>
-                            <td>
-                                <strong class="tnum"><?= (int) $p['portfolio_count'] ?></strong> work &middot; <strong class="tnum"><?= (int) $p['inquiry_count'] ?></strong> leads
-                            </td>
-                            <td>
-                                <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
-                                    <span class="badge <?= $p['status'] === 'active' ? 'badge-avail' : 'badge-type' ?>"><?= e($p['status']) ?></span>
-                                    <?php if (!empty($p['is_verified'])): ?>
-                                        <span class="badge badge-verified">Verified</span>
-                                    <?php endif; ?>
-                                    <?php if (!empty($p['is_featured'])): ?>
-                                        <span class="badge badge-featured">Featured</span>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                            <td>
-                                <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
-                                    <form method="POST" action="<?= e(route_url('/admin/moderate')) ?>">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="provider_id" value="<?= (int) $p['id'] ?>">
-                                        <input type="hidden" name="mod_action" value="toggle_verified">
-                                        <button type="submit" class="btn btn-outline btn-sm">
-                                            <?= !empty($p['is_verified']) ? 'Unverify' : 'Verify' ?>
-                                        </button>
-                                    </form>
-                                    <form method="POST" action="<?= e(route_url('/admin/moderate')) ?>">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="provider_id" value="<?= (int) $p['id'] ?>">
-                                        <input type="hidden" name="mod_action" value="toggle_featured">
-                                        <button type="submit" class="btn btn-outline btn-sm">
-                                            <?= !empty($p['is_featured']) ? 'Unfeature' : 'Feature' ?>
-                                        </button>
-                                    </form>
-                                    <form method="POST" action="<?= e(route_url('/admin/moderate')) ?>">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="provider_id" value="<?= (int) $p['id'] ?>">
-                                        <input type="hidden" name="mod_action" value="toggle_status">
-                                        <button type="submit" class="btn btn-danger-outline btn-sm">
-                                            <?= $p['status'] === 'active' ? 'Pause' : 'Activate' ?>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <h2 id="reviews" class="m-0" style="margin-block:2.5rem 0.5rem;">Reviews</h2>
-        <p class="text-muted" style="margin-block-end:1rem;">
-            <strong class="tnum"><?= (int) $pendingReviews ?></strong> waiting for approval.
-            Reviews from people who requested a quote through Kopii go live automatically. All others wait here and do not count toward ratings until you approve them.
-        </p>
-
-        <?php if (empty($reviews)): ?>
-            <p class="text-muted">No reviews yet.</p>
+        <h2 class="admin-section-title">Recent admin activity</h2>
+        <?php if (empty($recent)): ?>
+            <p class="empty-state">Nothing yet. Verifying a listing, pausing one or moderating a review will be recorded here.</p>
         <?php else: ?>
-            <div class="table-scroll">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Provider</th>
-                            <th scope="col">Reviewer</th>
-                            <th scope="col">Rating</th>
-                            <th scope="col">Review</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($reviews as $rev): ?>
-                            <tr>
-                                <td><a href="<?= e(route_url('/provider/' . $rev['provider_slug'])) ?>"><?= e($rev['business_name']) ?></a></td>
-                                <td>
-                                    <?= e($rev['reviewer_name']) ?>
-                                    <div class="text-muted" style="font-size:0.8rem;"><?= e(time_ago((string) $rev['created_at'])) ?></div>
-                                </td>
-                                <td class="tnum"><?= (int) $rev['rating'] ?>/5</td>
-                                <td style="max-inline-size:28rem;"><?= e($rev['comment']) ?></td>
-                                <td>
-                                    <?php if ($rev['status'] === 'published'): ?>
-                                        <span class="badge badge-avail">Published</span>
-                                        <?php if (!empty($rev['verified_request'])): ?>
-                                            <div class="text-muted" style="font-size:0.8rem;">Requested a quote</div>
-                                        <?php endif; ?>
-                                    <?php else: ?>
-                                        <span class="badge badge-type">Waiting</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
-                                        <?php if ($rev['status'] !== 'published'): ?>
-                                            <form method="POST" action="<?= e(route_url('/admin/reviews/moderate')) ?>">
-                                                <?= csrf_field() ?>
-                                                <input type="hidden" name="review_id" value="<?= (int) $rev['id'] ?>">
-                                                <input type="hidden" name="review_action" value="approve">
-                                                <button type="submit" class="btn btn-outline btn-sm">Approve</button>
-                                            </form>
-                                        <?php endif; ?>
-                                        <form method="POST" action="<?= e(route_url('/admin/reviews/moderate')) ?>">
-                                            <?= csrf_field() ?>
-                                            <input type="hidden" name="review_id" value="<?= (int) $rev['id'] ?>">
-                                            <input type="hidden" name="review_action" value="delete">
-                                            <button type="submit" class="btn btn-danger-outline btn-sm">Delete</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <div class="admin-card">
+                <ul class="log-list">
+                    <?php foreach ($recent as $row): ?>
+                        <li>
+                            <span><?= e(AdminLogModel::describe($row)) ?></span>
+                            <?php if ((string) $row['note'] !== ''): ?>
+                                <span class="log-note">&ldquo;<?= e($row['note']) ?>&rdquo;</span>
+                            <?php endif; ?>
+                            <span class="log-meta"><?= e($row['admin_name'] ?? 'An administrator') ?> &middot; <?= e(time_ago((string) $row['created_at'])) ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
             </div>
+            <p><a href="<?= e(route_url('/admin/activity')) ?>">See all activity</a></p>
         <?php endif; ?>
     </div>
 </section>

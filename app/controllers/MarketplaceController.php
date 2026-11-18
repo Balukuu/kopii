@@ -411,6 +411,15 @@ class MarketplaceController
         RateLimiter::hit('review', $ip);
         RateLimiter::hit('review_provider', $ip . '|' . $providerId);
 
+        // A review that is not public yet needs an administrator: say so by email, so it does not wait unseen.
+        if (!$verifiedRequest) {
+            Notifier::reviewWaiting((string) $provider['business_name'], [
+                'reviewer_name' => $name,
+                'rating'        => $rating,
+                'comment'       => $comment,
+            ]);
+        }
+
         flash('success', $verifiedRequest
             ? 'Thank you! Your review is now live on ' . $provider['business_name'] . '\'s showcase.'
             : 'Thank you! Your review will appear on ' . $provider['business_name'] . '\'s showcase once the Kopii team has checked it.');

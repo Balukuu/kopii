@@ -913,6 +913,44 @@
     });
   };
 
+  // Two-step confirm for destructive buttons, without a browser dialog. A form with a
+  // data-confirm="Label" attribute needs two presses: the first turns its button red and relabels
+  // it (e.g. "Yes, delete"), the second sends it. Leaving the form or waiting 5 seconds backs out.
+  // Without JavaScript the form simply submits on the first press.
+  // Registered before the loading-state handler, which would otherwise disable the button on press one.
+  const initConfirmForms = () => {
+    document.querySelectorAll('form[data-confirm]').forEach((form) => {
+      const button = form.querySelector('button[type="submit"]');
+      if (!button) return;
+
+      const original = button.textContent;
+      const armedLabel = form.getAttribute('data-confirm') || 'Confirm';
+      let timer = 0;
+
+      const disarm = () => {
+        window.clearTimeout(timer);
+        form.removeAttribute('data-armed');
+        button.classList.remove('is-armed');
+        button.textContent = original;
+      };
+
+      form.addEventListener('submit', (event) => {
+        if (form.hasAttribute('data-armed')) return; // second press: let it through
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        form.setAttribute('data-armed', '');
+        button.classList.add('is-armed');
+        button.textContent = armedLabel;
+        timer = window.setTimeout(disarm, 5000);
+      });
+
+      form.addEventListener('focusout', (event) => {
+        if (form.hasAttribute('data-armed') && !form.contains(event.relatedTarget)) disarm();
+      });
+    });
+  };
+
   initNavbar();
   initHeroSpotlight();
   initVerticalTabs();
@@ -921,5 +959,6 @@
   initPortfolioLightbox();
   initAuthEnhancements();
   initShortlist();
+  initConfirmForms();
   initDeferredValidation();
 })();

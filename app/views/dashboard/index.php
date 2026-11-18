@@ -47,6 +47,13 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
 
 <section class="section-pad-sm">
     <div class="container">
+        <?php if (($provider['status'] ?? 'active') !== 'active'): ?>
+            <div class="alert alert-warning" role="status">
+                Your listing is paused by the Kopii team, so it is hidden from search and clients cannot send you quote requests.
+                Check your email for the reason, or contact the Kopii team to have it made live again.
+            </div>
+        <?php endif; ?>
+
         <?php if ($tab === 'overview'): ?>
             <div class="kpi-grid">
                 <div class="kpi-card">

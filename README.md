@@ -19,9 +19,13 @@
   - Upload & manage **Portfolio Showcase** photographs (`JPG`, `PNG`, `WebP` validated via `finfo` + `getimagesize`).
   - Create & manage **UGX Service Packages**.
   - Customize profile bio, specialties, Ugandan location, avatar, cover banner, and booking availability.
-- **Admin Moderation Console (`/admin`)**:
-  - Toggle **Verified** badges, **Featured** homepage placements, and active/paused status.
-  - **Review moderation**: approve or delete reviews (see *Security notes*).
+- **Admin Console (`/admin`)**, five sections:
+  - **Overview**: what needs a decision (reviews waiting, listings to verify, unconfirmed emails), the last 7 days, and recent admin activity. The *Admin* link in the nav carries a badge with the number of reviews waiting.
+  - **Listings** (`/admin/providers`): search and filter by status, Verified, Featured. Each listing has a review page with the evidence for the three Verified checks (phone / WhatsApp, portfolio, pricing). **Verify** needs all three ticked and records who verified and when. Pause (with a reason) and Feature are explicit actions, never "flip whatever it is now".
+  - **Reviews**: waiting / published / all, approve or delete (two presses to delete).
+  - **Users**: search and filter accounts, resend a confirmation email, **suspend** (reason required, emailed to them) and reinstate.
+  - **Activity**: the audit log of every admin action, kept even after the thing it was about is deleted.
+  - Providers are emailed when they are verified, paused, reactivated or suspended, and administrators are emailed when a review is waiting. A paused provider sees a banner on their dashboard.
 
 ---
 
@@ -80,9 +84,13 @@ If you change the process, update the wording in `app/views/pages/home.php` (the
 - **Errors are never shown to visitors.** Anything unexpected is logged (cPanel → Errors, or your PHP error log) and visitors get a plain apology page. Only `app_env = local` shows details on screen.
 - **Rate limiting.** Sign-in (per account and per connection), registration, quote requests, hire briefs, reviews, and password resets are throttled. Behind Cloudflare or another proxy, set `'trusted_ip_header'` in `app/config/env.php` (for Cloudflare, `'HTTP_CF_CONNECTING_IP'`); otherwise every visitor looks like the proxy and shares one allowance.
 - **Email addresses must be confirmed** before they are used to find a client's earlier quote requests. New accounts get a confirmation link by email; opening a password-reset link also confirms the address. Without this, anyone could register somebody else's address and read their requests.
-- **Review moderation.** A review from a signed-in person who really asked that provider for a quote through Kopii is published immediately. Every other review waits as *pending* in `/admin#reviews` and does not count toward ratings or ranking until you approve it. Providers cannot review themselves, and each account can review a provider once.
+- **Review moderation.** A review from a signed-in person who really asked that provider for a quote through Kopii is published immediately. Every other review waits as *pending* in `/admin/reviews` and does not count toward ratings or ranking until you approve it (you also get an email). Providers cannot review themselves, and each account can review a provider once.
+- **Suspending an account takes effect immediately.** The signed-in account is re-checked against the database on every request (`refresh_session_user()`), so a suspended person is signed out on their next click, cannot sign in again, and their listing is hidden. Reinstating brings the listing back *paused*; you make it public on purpose. Administrator accounts cannot be suspended from the console.
+- **Every admin action is logged** in the `admin_log` table (who, what, when, and the note), shown on *Activity* and on each listing's page. Deleted reviews keep their text in the log.
+- **Admin forms can only return to `/admin` pages.** The hidden `return` field is checked against a strict pattern, so it cannot be used to bounce an admin to another site.
+- **Set `'support_email'`** in `app/config/env.php` so the emails about a paused listing or suspended account tell the provider where to write. Without it they say "get in touch with the Kopii team".
 - **Files that must never be downloaded** (`.md`, `.sql`, `.sqlite`, `.log`, `.lock`, backups) are blocked by `.htaccess`, in addition to the blocked `app/`, `database/` and `storage/` folders.
-- **Upgrading an existing site:** new columns and tables are added automatically the first time the site runs (`app/core/Migrator.php`; progress is remembered in `storage/schema.version`). The database user needs the `ALTER` and `CREATE` privileges, which cPanel's "All Privileges" includes.
+- **Upgrading an existing site:** new columns and tables are added automatically the first time the site runs (`app/core/Migrator.php`; progress is remembered in `storage/schema.version`, currently version 2: account suspension, who-verified-when, the admin log). The database user needs the `ALTER` and `CREATE` privileges, which cPanel's "All Privileges" includes. The MySQL side of the migration has not been run against a real MySQL server yet, so after uploading check `/admin/activity` loads, and look at your PHP error log once.
 
 ## Running Locally
 

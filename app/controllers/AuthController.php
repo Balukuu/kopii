@@ -228,6 +228,12 @@ class AuthController
 
         RateLimiter::clear('login', $subject);
 
+        // Said only after the password was right, so it tells a stranger nothing about the account.
+        if (!empty($user['suspended_at'])) {
+            flash('error', 'This account has been suspended. Please contact the Kopii team if you think that is a mistake.');
+            redirect_to('/login');
+        }
+
         session_regenerate_id(true);
         $_SESSION['user'] = [
             'id'        => (int) $user['id'],

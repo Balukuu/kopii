@@ -13,7 +13,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
  */
 final class Migrator
 {
-    private const VERSION = 1;
+    private const VERSION = 2;
 
     public static function run(PDO $pdo): void
     {
@@ -98,6 +98,59 @@ final class Migrator
                     UNIQUE KEY `uq_email_verifications_token` (`token_hash`),
                     KEY `idx_email_verifications_user` (`user_id`, `created_at`),
                     CONSTRAINT `fk_email_verifications_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+            );
+        }
+
+        // v2: admin console. Account suspension, a record of who verified a listing and when, and
+        // an audit log of every administrator action.
+        if (!self::hasColumn($pdo, 'users', 'suspended_at')) {
+            $pdo->exec($sqlite
+                ? 'ALTER TABLE users ADD COLUMN suspended_at TEXT DEFAULT NULL'
+                : 'ALTER TABLE `users` ADD COLUMN `suspended_at` DATETIME DEFAULT NULL');
+        }
+        if (!self::hasColumn($pdo, 'providers', 'verified_at')) {
+            $pdo->exec($sqlite
+                ? 'ALTER TABLE providers ADD COLUMN verified_at TEXT DEFAULT NULL'
+                : 'ALTER TABLE `providers` ADD COLUMN `verified_at` DATETIME DEFAULT NULL');
+        }
+        if (!self::hasColumn($pdo, 'providers', 'verified_by')) {
+            $pdo->exec($sqlite
+                ? 'ALTER TABLE providers ADD COLUMN verified_by INTEGER DEFAULT NULL'
+                : 'ALTER TABLE `providers` ADD COLUMN `verified_by` INT UNSIGNED DEFAULT NULL');
+        }
+
+        if ($sqlite) {
+            $pdo->exec(
+                'CREATE TABLE IF NOT EXISTS admin_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    admin_user_id INTEGER DEFAULT NULL,
+                    action TEXT NOT NULL,
+                    target_type TEXT NOT NULL,
+                    target_id INTEGER DEFAULT NULL,
+                    target_label TEXT NOT NULL DEFAULT \'\',
+                    note TEXT NOT NULL DEFAULT \'\',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE SET NULL
+                )'
+            );
+            $pdo->exec('CREATE INDEX IF NOT EXISTS idx_admin_log_created ON admin_log (created_at)');
+            $pdo->exec('CREATE INDEX IF NOT EXISTS idx_admin_log_target ON admin_log (target_type, target_id)');
+        } else {
+            $pdo->exec(
+                'CREATE TABLE IF NOT EXISTS `admin_log` (
+                    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    `admin_user_id` INT UNSIGNED DEFAULT NULL,
+                    `action` VARCHAR(40) NOT NULL,
+                    `target_type` VARCHAR(20) NOT NULL,
+                    `target_id` INT UNSIGNED DEFAULT NULL,
+                    `target_label` VARCHAR(190) NOT NULL DEFAULT \'\',
+                    `note` VARCHAR(500) NOT NULL DEFAULT \'\',
+                    `created_at` DATETIME NOT NULL,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_admin_log_created` (`created_at`),
+                    KEY `idx_admin_log_target` (`target_type`, `target_id`),
+                    CONSTRAINT `fk_admin_log_user` FOREIGN KEY (`admin_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
             );
         }

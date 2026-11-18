@@ -97,6 +97,8 @@ require_once KOPII_ROOT . '/app/models/ProviderModel.php';
 require_once KOPII_ROOT . '/app/models/InquiryModel.php';
 require_once KOPII_ROOT . '/app/models/PasswordResetModel.php';
 require_once KOPII_ROOT . '/app/models/EmailVerificationModel.php';
+require_once KOPII_ROOT . '/app/models/AdminLogModel.php';
+require_once KOPII_ROOT . '/app/models/AdminModel.php';
 
 require_once KOPII_ROOT . '/app/controllers/MarketplaceController.php';
 require_once KOPII_ROOT . '/app/controllers/AuthController.php';
@@ -127,6 +129,10 @@ set_exception_handler(static function (Throwable $e): void {
 });
 
 Database::init($config);
+
+// Signed-in visitors are checked against the database each request, so suspending an account
+// takes effect at once instead of when its session happens to end.
+refresh_session_user();
 
 $router = new Router();
 
@@ -165,7 +171,13 @@ $router->post('/dashboard/inquiries/status', [DashboardController::class, 'updat
 
 // Platform Admin Routes
 $router->get('/admin', [AdminController::class, 'index']);
+$router->get('/admin/providers', [AdminController::class, 'providers']);
+$router->get('/admin/providers/{id}', [AdminController::class, 'provider']);
 $router->post('/admin/moderate', [AdminController::class, 'moderate']);
+$router->get('/admin/reviews', [AdminController::class, 'reviews']);
 $router->post('/admin/reviews/moderate', [AdminController::class, 'moderateReview']);
+$router->get('/admin/users', [AdminController::class, 'users']);
+$router->post('/admin/users/action', [AdminController::class, 'userAction']);
+$router->get('/admin/activity', [AdminController::class, 'activity']);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');

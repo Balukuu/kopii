@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'provider',
     avatar_path TEXT DEFAULT NULL,
     email_verified_at TEXT DEFAULT NULL,
+    suspended_at TEXT DEFAULT NULL,
     created_at TEXT NOT NULL
 );
 
@@ -45,6 +46,8 @@ CREATE TABLE IF NOT EXISTS providers (
     avatar_path TEXT DEFAULT NULL,
     cover_path TEXT DEFAULT NULL,
     is_verified INTEGER NOT NULL DEFAULT 0,
+    verified_at TEXT DEFAULT NULL,
+    verified_by INTEGER DEFAULT NULL,
     is_featured INTEGER NOT NULL DEFAULT 0,
     is_available INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'active',
@@ -149,3 +152,20 @@ CREATE TABLE IF NOT EXISTS email_verifications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications (user_id, created_at);
+
+-- Every action an administrator takes (verify, pause, suspend, delete a review...). target_label is a
+-- snapshot of the name at the time, so the record still reads properly after the target is deleted.
+CREATE TABLE IF NOT EXISTS admin_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_user_id INTEGER DEFAULT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id INTEGER DEFAULT NULL,
+    target_label TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_log_created ON admin_log (created_at);
+CREATE INDEX IF NOT EXISTS idx_admin_log_target ON admin_log (target_type, target_id);

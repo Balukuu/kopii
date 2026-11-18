@@ -18,6 +18,10 @@ return [
     // Leave empty if visitors connect directly. Only set it if a proxy really overwrites that header.
     'trusted_ip_header' => '',
 
+    // Address shown to providers in emails about a paused listing or suspended account, so they can
+    // reply to the team. Leave '' to say "get in touch with the Kopii team" without an address.
+    'support_email' => '',
+
     // Outbound email (lead alerts to providers, password resets).
     // 'mail' uses PHP's mail() — the normal choice on cPanel. Use a From address on your own
     // domain and enable SPF + DKIM in cPanel → Email Deliverability so messages reach inboxes.

@@ -122,6 +122,137 @@ final class Notifier
         }
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Admin-initiated emails. $provider is a row from AdminModel::providerDetail().
+    // ---------------------------------------------------------------------------------------
+
+    public static function listingVerified(array $provider): void
+    {
+        try {
+            $body = implode("\n", [
+                'Hi ' . self::firstName((string) ($provider['owner_name'] ?? '')) . ',',
+                '',
+                'Good news: the Kopii team has checked ' . $provider['business_name'] . ' and added the Verified badge to your listing.',
+                '',
+                'It now shows on your profile and next to your name in search results.',
+                absolute_url('/provider/' . $provider['slug']),
+            ]);
+            Mailer::send((string) $provider['owner_email'], 'You are now Verified on Kopii', $body);
+        } catch (Throwable $e) {
+            error_log('[Kopii] verified email failed: ' . $e->getMessage());
+        }
+    }
+
+    public static function listingPaused(array $provider, string $reason): void
+    {
+        try {
+            $lines = [
+                'Hi ' . self::firstName((string) ($provider['owner_name'] ?? '')) . ',',
+                '',
+                'The Kopii team has paused ' . $provider['business_name'] . '. It is hidden from search and your public profile is not visible until it is reactivated.',
+            ];
+            if (trim($reason) !== '') {
+                $lines[] = '';
+                $lines[] = 'Reason: ' . trim($reason);
+            }
+            $lines[] = '';
+            $lines[] = self::contactLine();
+            Mailer::send((string) $provider['owner_email'], 'Your Kopii listing has been paused', implode("\n", $lines));
+        } catch (Throwable $e) {
+            error_log('[Kopii] paused email failed: ' . $e->getMessage());
+        }
+    }
+
+    public static function listingReactivated(array $provider): void
+    {
+        try {
+            $body = implode("\n", [
+                'Hi ' . self::firstName((string) ($provider['owner_name'] ?? '')) . ',',
+                '',
+                $provider['business_name'] . ' is live on Kopii again. Clients can find it in search and send you quote requests.',
+                absolute_url('/provider/' . $provider['slug']),
+            ]);
+            Mailer::send((string) $provider['owner_email'], 'Your Kopii listing is live again', $body);
+        } catch (Throwable $e) {
+            error_log('[Kopii] reactivated email failed: ' . $e->getMessage());
+        }
+    }
+
+    public static function accountSuspended(array $user, string $reason): void
+    {
+        try {
+            $lines = [
+                'Hi ' . self::firstName((string) ($user['full_name'] ?? '')) . ',',
+                '',
+                'Your Kopii account has been suspended. You cannot sign in, and any listing on your account is hidden.',
+            ];
+            if (trim($reason) !== '') {
+                $lines[] = '';
+                $lines[] = 'Reason: ' . trim($reason);
+            }
+            $lines[] = '';
+            $lines[] = self::contactLine();
+            Mailer::send((string) $user['email'], 'Your Kopii account has been suspended', implode("\n", $lines));
+        } catch (Throwable $e) {
+            error_log('[Kopii] suspension email failed: ' . $e->getMessage());
+        }
+    }
+
+    public static function accountReinstated(array $user): void
+    {
+        try {
+            $body = implode("\n", [
+                'Hi ' . self::firstName((string) ($user['full_name'] ?? '')) . ',',
+                '',
+                'Your Kopii account is active again and you can sign in:',
+                absolute_url('/login'),
+                '',
+                'If you have a listing, it stays hidden until the Kopii team makes it public again.',
+            ]);
+            Mailer::send((string) $user['email'], 'Your Kopii account is active again', $body);
+        } catch (Throwable $e) {
+            error_log('[Kopii] reinstated email failed: ' . $e->getMessage());
+        }
+    }
+
+    /** Tell every administrator that a review is waiting, so it does not sit unseen. */
+    public static function reviewWaiting(string $businessName, array $review): void
+    {
+        try {
+            $recipients = AdminModel::adminEmails();
+            if (empty($recipients)) {
+                return;
+            }
+
+            $body = implode("\n", [
+                'A review is waiting for approval on Kopii.',
+                '',
+                'Provider: ' . $businessName,
+                'From:     ' . self::limit((string) ($review['reviewer_name'] ?? ''), 80),
+                'Rating:   ' . (int) ($review['rating'] ?? 0) . '/5',
+                '',
+                self::limit((string) ($review['comment'] ?? ''), 600),
+                '',
+                'It is not public and does not count toward the rating until you approve it:',
+                absolute_url('/admin/reviews', ['status' => 'pending']),
+            ]);
+            foreach ($recipients as $to) {
+                Mailer::send($to, 'A review is waiting for approval — Kopii', $body);
+            }
+        } catch (Throwable $e) {
+            error_log('[Kopii] pending review alert failed: ' . $e->getMessage());
+        }
+    }
+
+    /** How to reach the team. Set 'support_email' in app/config/env.php to give a real address. */
+    private static function contactLine(): string
+    {
+        $support = trim((string) app_config('support_email', ''));
+        return $support !== ''
+            ? 'If you think this is a mistake, write to us at ' . $support . '.'
+            : 'If you think this is a mistake, please get in touch with the Kopii team.';
+    }
+
     private static function firstName(string $fullName): string
     {
         $parts = preg_split('/\s+/', trim($fullName)) ?: [];
