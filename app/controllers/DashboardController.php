@@ -28,12 +28,14 @@ class DashboardController
                 'sentInquiries' => $sentInquiries,
                 'categories'    => $categories,
                 'cities'        => $uganda['cities'],
+                'myOpportunities' => count(OpportunityModel::forUser((int) $user['id'])),
+                'newProposals'    => OpportunityModel::newResponseCount((int) $user['id']),
             ]);
             return;
         }
 
         $tab = (string) ($_GET['tab'] ?? 'overview');
-        if (!in_array($tab, ['overview', 'inquiries', 'portfolio', 'packages', 'profile'], true)) {
+        if (!in_array($tab, ['overview', 'inquiries', 'portfolio', 'packages', 'products', 'profile'], true)) {
             $tab = 'overview';
         }
 
@@ -42,6 +44,13 @@ class DashboardController
         $packages      = ProviderModel::getPackages((int) $provider['id']);
         $inquiries     = InquiryModel::forProvider((int) $provider['id'], $statusFilter);
         $inquiryCounts = InquiryModel::countsForProvider((int) $provider['id']);
+        $products      = ProductModel::forProvider((int) $provider['id']);
+
+        // "Edit" opens the form on the Products tab filled in with that product.
+        $editing = null;
+        if ($tab === 'products' && ctype_digit((string) ($_GET['edit'] ?? ''))) {
+            $editing = ProductModel::findOwned((int) $_GET['edit'], (int) $provider['id']);
+        }
 
         // Compute profile completeness score
         $checks = [
@@ -70,6 +79,14 @@ class DashboardController
             'cities'        => $uganda['cities'],
             'responseTimes' => $uganda['response_times'],
             'priceUnits'    => $uganda['price_units'],
+            'products'      => $products,
+            'editing'       => $editing,
+            'productCategories' => ProductModel::categories(),
+            'productUnits'  => $uganda['product_units'],
+            'productConditions' => $uganda['product_conditions'],
+            'stockStatuses' => $uganda['stock_statuses'],
+            'maxImages'     => ProductModel::MAX_IMAGES,
+            'newProposals'  => OpportunityModel::newResponseCount((int) $user['id']),
         ]);
     }
 

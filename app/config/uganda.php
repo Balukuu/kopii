@@ -59,4 +59,38 @@ return [
         'per hour',
         'starting from',
     ],
+
+    // What a product is sold by. Shown next to the price: "UGX 45,000 per kg".
+    'product_units' => [
+        'each',
+        'per pair',
+        'per set',
+        'per dozen',
+        'per kg',
+        'per litre',
+        'per bag',
+        'per metre',
+        'per carton',
+    ],
+
+    'stock_statuses' => [
+        'in_stock'      => 'In stock',
+        'low_stock'     => 'Low stock',
+        'made_to_order' => 'Made to order',
+        'out_of_stock'  => 'Out of stock',
+    ],
+
+    'product_conditions' => [
+        'new'         => 'New',
+        'used'        => 'Used',
+        'refurbished' => 'Refurbished',
+    ],
+
+    // Kinds of public opportunity a client or business can post for providers to answer.
+    'opportunity_kinds' => [
+        'project' => 'Project / gig',
+        'job'     => 'Job',
+        'tender'  => 'Tender / quotation',
+        'supply'  => 'Supply request',
+    ],
 ];

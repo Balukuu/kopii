@@ -13,7 +13,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
  */
 final class Migrator
 {
-    private const VERSION = 2;
+    private const VERSION = 3;
 
     public static function run(PDO $pdo): void
     {
@@ -154,6 +154,104 @@ final class Migrator
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
             );
         }
+
+        // v3: the shop and the opportunities board. The new tables are all `CREATE TABLE IF NOT EXISTS`
+        // in the schema file, so that file is the one place they are defined; the columns added to
+        // tables that already existed are the only steps spelled out here.
+        if (!self::hasColumn($pdo, 'inquiries', 'product_id')) {
+            $pdo->exec($sqlite
+                ? 'ALTER TABLE inquiries ADD COLUMN product_id INTEGER DEFAULT NULL'
+                : 'ALTER TABLE `inquiries` ADD COLUMN `product_id` INT UNSIGNED DEFAULT NULL');
+        }
+        if (!self::hasColumn($pdo, 'inquiries', 'product_name')) {
+            $pdo->exec($sqlite
+                ? 'ALTER TABLE inquiries ADD COLUMN product_name TEXT DEFAULT NULL'
+                : 'ALTER TABLE `inquiries` ADD COLUMN `product_name` VARCHAR(160) DEFAULT NULL');
+        }
+
+        $schemaSql = (string) file_get_contents(
+            KOPII_ROOT . '/database/' . ($sqlite ? 'schema.sqlite.sql' : 'schema.mysql.sql')
+        );
+        if ($sqlite) {
+            $pdo->exec($schemaSql);
+        } else {
+            // PDO's MySQL driver runs a multi-statement string but only reports a failure in the FIRST
+            // statement: a table that failed to create would pass unnoticed and the version number
+            // would still move on. One statement per call makes every failure throw, so the upgrade
+            // is retried on the next request instead of being recorded as done.
+            foreach (self::splitStatements($schemaSql) as $statement) {
+                $pdo->exec($statement);
+            }
+        }
+
+        require_once KOPII_ROOT . '/database/Seeder.php';
+        Seeder::seedProductCategories($pdo);
+
+        // A developer's own demo database gets sample products and opportunities so the new pages are
+        // not empty. Never on a live site: it needs app_env = local, SQLite, and the seeded demo providers.
+        if ($sqlite && app_is_local()) {
+            Seeder::seedCommerceDemo($pdo);
+        }
+    }
+
+    /**
+     * Split a schema file into single statements: on `;` outside quotes and outside `-- ` comments
+     * (the schema's comments contain semicolons of their own).
+     *
+     * @return list<string>
+     */
+    public static function splitStatements(string $sql): array
+    {
+        $statements = [];
+        $current    = '';
+        $quote      = '';
+        $length     = strlen($sql);
+
+        for ($i = 0; $i < $length; $i++) {
+            $ch = $sql[$i];
+
+            if ($quote !== '') {
+                $current .= $ch;
+                if ($ch === '\\' && $quote !== '`' && $i + 1 < $length) {
+                    $current .= $sql[++$i];
+                } elseif ($ch === $quote) {
+                    $quote = '';
+                }
+                continue;
+            }
+
+            if ($ch === '-' && ($sql[$i + 1] ?? '') === '-' && ctype_space($sql[$i + 2] ?? ' ')) {
+                $end = strpos($sql, "\n", $i);
+                if ($end === false) {
+                    break;
+                }
+                $i = $end - 1; // the newline itself is kept by the next pass
+                continue;
+            }
+
+            if ($ch === "'" || $ch === '"' || $ch === '`') {
+                $quote    = $ch;
+                $current .= $ch;
+                continue;
+            }
+
+            if ($ch === ';') {
+                $statement = trim($current);
+                if ($statement !== '') {
+                    $statements[] = $statement;
+                }
+                $current = '';
+                continue;
+            }
+
+            $current .= $ch;
+        }
+
+        $statement = trim($current);
+        if ($statement !== '') {
+            $statements[] = $statement;
+        }
+        return $statements;
     }
 
     private static function hasColumn(PDO $pdo, string $table, string $column): bool

@@ -3921,3 +3921,461 @@ input[type="tel"] {
 .admin-card form + form {
   margin-block-start: var(--space-3);
 }
+
+/* ==========================================================================
+   Shop and opportunities
+   Cards use a border and no shadow, like the provider cards. One accent colour for actions;
+   green and amber only mean status (in stock, low stock, closing soon).
+   ========================================================================== */
+.badge-warn {
+  background: var(--warning-tint);
+  color: var(--warning);
+  border: 1px solid #f6dfb2;
+}
+
+.badge-out {
+  background: var(--danger-tint);
+  color: var(--danger);
+  border: 1px solid #f3cdd7;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr));
+  gap: var(--space-5);
+}
+
+.product-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: clip;
+  transition: border-color var(--dur-base) ease;
+}
+
+.product-card:has(a.card-link:hover) {
+  border-color: var(--accent);
+}
+
+.product-card:has(a.card-link:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The whole card is one link: the title's link is stretched over it. */
+.product-card a.card-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.product-card a.card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.product-card a.card-link:focus-visible {
+  outline: none;
+}
+
+.product-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-alt);
+  overflow: clip;
+}
+
+.product-media img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.product-media-empty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  block-size: 100%;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.product-media .badge {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-start: var(--space-3);
+}
+
+.product-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+}
+
+.product-card-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.product-price {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.product-price small {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+.product-seller {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-block-start: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.product-seller span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.product-seller svg {
+  color: var(--ink-3);
+}
+
+.shop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-end: var(--space-5);
+}
+
+.product-gallery {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.product-gallery-main {
+  aspect-ratio: 4 / 3;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: clip;
+}
+
+.product-gallery-main img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
+
+.product-gallery-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.product-gallery-thumbs button {
+  inline-size: 4.5rem;
+  aspect-ratio: 1;
+  padding: 0;
+  background: var(--surface-alt);
+  border: 2px solid transparent;
+  border-radius: var(--radius-control);
+  overflow: clip;
+  cursor: pointer;
+}
+
+.product-gallery-thumbs button[aria-current="true"] {
+  border-color: var(--accent);
+}
+
+.product-gallery-thumbs img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.product-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-5);
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-sm);
+}
+
+.product-facts dt {
+  color: var(--ink-3);
+}
+
+.product-facts dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.price-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-block: var(--space-2) var(--space-4);
+}
+
+.price-line strong {
+  font-size: var(--text-2xl);
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.price-line span {
+  color: var(--ink-3);
+}
+
+/* Dashboard: one row per product on the Products tab */
+.product-row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  padding-block: var(--space-4);
+  border-block-start: 1px solid var(--line);
+}
+
+.product-row:first-of-type {
+  border-block-start: 0;
+  padding-block-start: 0;
+}
+
+.product-row-thumb {
+  inline-size: 4.5rem;
+  aspect-ratio: 1;
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  overflow: clip;
+  display: grid;
+  place-content: center;
+  color: var(--ink-3);
+}
+
+.product-row-thumb img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.product-row h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+}
+
+.product-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.photo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-block-end: var(--space-2);
+}
+
+.photo-strip figure {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+
+.photo-strip img {
+  inline-size: 5rem;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+}
+
+/* Opportunities */
+.opp-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.opp-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  transition: border-color var(--dur-base) ease;
+}
+
+.opp-card:has(a.card-link:hover) {
+  border-color: var(--accent);
+}
+
+.opp-card:has(a.card-link:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.opp-card a.card-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.opp-card a.card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.opp-card a.card-link:focus-visible {
+  outline: none;
+}
+
+.opp-card h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.opp-card p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-wrap: pretty;
+}
+
+.opp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.opp-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.opp-meta svg {
+  color: var(--ink-3);
+}
+
+.opp-budget {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.opp-body {
+  white-space: pre-line;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.proposal-card {
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.proposal-card + .proposal-card {
+  margin-block-start: var(--space-4);
+}
+
+.proposal-card.is-hired {
+  border-color: var(--success-icon);
+  background: var(--success-tint);
+}
+
+.proposal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+}
+
+.proposal-head h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.proposal-message {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-alt);
+  border-radius: var(--radius-control);
+  white-space: pre-line;
+}
+
+.proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.proposal-actions form {
+  margin: 0;
+}
+
+.board-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--accent-tint);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-card);
+}
+
+.board-cta h2,
+.board-cta h3 {
+  margin: 0 0 var(--space-1);
+}
+
+.board-cta p {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+@media (max-width: 36rem) {
+  .product-facts {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .product-facts dd {
+    margin-block-end: var(--space-2);
+  }
+}

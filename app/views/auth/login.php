@@ -90,6 +90,14 @@ defined('KOPII_APP') or exit('Direct access denied.');
                     <button
                         type="button"
                         class="btn btn-outline btn-sm"
+                        data-demo-email="client@kopii.online"
+                        data-demo-pass="KopiiDemo2026!"
+                    >
+                        Client
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-outline btn-sm"
                         data-demo-email="admin@kopii.online"
                         data-demo-pass="KopiiAdmin2026!"
                     >

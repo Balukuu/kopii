@@ -173,6 +173,9 @@ $timelines = [
                     </div>
                 </div>
             </form>
+            <p class="text-muted" style="margin:1.25rem 0 0; font-size:0.9rem;">
+                Rather have providers come to you? <a href="<?= e(route_url('/opportunities/new')) ?>">Post it as a public opportunity</a> and compare their proposals.
+            </p>
         </div>
     </div>
 </section>

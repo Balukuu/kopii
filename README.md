@@ -19,9 +19,12 @@
   - Upload & manage **Portfolio Showcase** photographs (`JPG`, `PNG`, `WebP` validated via `finfo` + `getimagesize`).
   - Create & manage **UGX Service Packages**.
   - Customize profile bio, specialties, Ugandan location, avatar, cover banner, and booking availability.
-- **Admin Console (`/admin`)**, five sections:
+- **Shop (`/shop`, `/product/{slug}`)**: any provider (a freelancer or a business) can list products with up to five photos, a price in UGX, condition and availability. Buyers browse by category, city and price, open a product, and message the seller; the message lands in the seller's **Client Leads** inbox (and by email) tagged with the product, exactly like a quote request. **There is no checkout or payment yet**; each product page says so. Sellers manage products on the **Shop Products** tab of their dashboard (add, edit, pause, delete). A product is public only while both it and its seller's listing are active.
+- **Opportunities board (`/opportunities`)**: a client or business with a *confirmed email* posts a project, job, tender or supply request (budget range, place, closing date; at most 5 posts a day). Providers answer with a proposal (message, price, timeline; one per opportunity). The poster's phone and email are never shown publicly; proposals arrive in `/dashboard/opportunities/{id}` and by email, where the poster can shortlist, decline or choose one, then close it or mark it filled. "Open" is a status *and* a date, so old posts drop off the board without any scheduled job.
+- **Admin Console (`/admin`)**, seven sections:
   - **Overview**: what needs a decision (reviews waiting, listings to verify, unconfirmed emails), the last 7 days, and recent admin activity. The *Admin* link in the nav carries a badge with the number of reviews waiting.
   - **Listings** (`/admin/providers`): search and filter by status, Verified, Featured. Each listing has a review page with the evidence for the three Verified checks (phone / WhatsApp, portfolio, pricing). **Verify** needs all three ticked and records who verified and when. Pause (with a reason) and Feature are explicit actions, never "flip whatever it is now".
+  - **Products** and **Opportunities**: search and filter, then **Hide** (a reason is required and emailed to the owner) or **Reinstate**. Hiding a provider or suspending an account also hides their products and opportunities.
   - **Reviews**: waiting / published / all, approve or delete (two presses to delete).
   - **Users**: search and filter accounts, resend a confirmation email, **suspend** (reason required, emailed to them) and reinstate.
   - **Activity**: the audit log of every admin action, kept even after the thing it was about is deleted.
@@ -90,7 +93,7 @@ If you change the process, update the wording in `app/views/pages/home.php` (the
 - **Admin forms can only return to `/admin` pages.** The hidden `return` field is checked against a strict pattern, so it cannot be used to bounce an admin to another site.
 - **Set `'support_email'`** in `app/config/env.php` so the emails about a paused listing or suspended account tell the provider where to write. Without it they say "get in touch with the Kopii team".
 - **Files that must never be downloaded** (`.md`, `.sql`, `.sqlite`, `.log`, `.lock`, backups) are blocked by `.htaccess`, in addition to the blocked `app/`, `database/` and `storage/` folders.
-- **Upgrading an existing site:** new columns and tables are added automatically the first time the site runs (`app/core/Migrator.php`; progress is remembered in `storage/schema.version`, currently version 2: account suspension, who-verified-when, the admin log). The database user needs the `ALTER` and `CREATE` privileges, which cPanel's "All Privileges" includes. The MySQL side of the migration has not been run against a real MySQL server yet, so after uploading check `/admin/activity` loads, and look at your PHP error log once.
+- **Upgrading an existing site:** new columns and tables are added automatically the first time the site runs (`app/core/Migrator.php`; progress is remembered in `storage/schema.version`, currently version 3: the shop and opportunities tables, and `product_id` / `product_name` on `inquiries`; version 2 was account suspension, who-verified-when and the admin log). The database user needs the `ALTER` and `CREATE` privileges, which cPanel's "All Privileges" includes. The MySQL side of the migration has not been run against a real MySQL server yet, so after uploading check `/admin/activity` loads, and look at your PHP error log once.
 
 ## Running Locally
 
@@ -109,4 +112,7 @@ When `app/config/env.php` is not present, Kopii automatically initializes and se
 These exist only in the local SQLite demo database. They are never created on a live install.
 
 - **Photographer Studio:** `pearl@kopii.online` / `KopiiDemo2026!`
+- **Client (posts opportunities):** `client@kopii.online` / `KopiiDemo2026!`
 - **Platform Admin:** `admin@kopii.online` / `KopiiAdmin2026!`
+
+The local demo database also holds **placeholder** products and opportunities (created by `Seeder::seedCommerceDemo()`, only when `app_env` is `local` on SQLite with the demo providers present, and only while the shop and board are still empty). The installer adds them only if you tick the sample-providers box.

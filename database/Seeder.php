@@ -65,6 +65,8 @@ class Seeder
             ':created' => $now,
         ]);
 
+        self::seedProductCategories($pdo);
+
         if (!$includeDemoListings) {
             self::markUsersVerified($pdo);
             return;
@@ -452,6 +454,157 @@ class Seeder
         }
 
         self::markUsersVerified($pdo);
+        self::seedCommerceDemo($pdo, $demoPassword);
+    }
+
+    /**
+     * The shop's product categories, from app/config/product_categories.php. Only fills an empty
+     * table, so categories an administrator later edits or adds in the database are left alone.
+     */
+    public static function seedProductCategories(PDO $pdo): void
+    {
+        if ((int) $pdo->query('SELECT COUNT(*) FROM product_categories')->fetchColumn() > 0) {
+            return;
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO product_categories (name, slug, icon, sort_order) VALUES (:name, :slug, :icon, :sort)');
+        $categories = require KOPII_ROOT . '/app/config/product_categories.php';
+        foreach ($categories as [$name, $slug, $icon, $sort]) {
+            $stmt->execute([':name' => $name, ':slug' => $slug, ':icon' => $icon, ':sort' => $sort]);
+        }
+    }
+
+    /**
+     * PLACEHOLDER sample content so the shop and the opportunities board are not empty on a developer's
+     * machine: products for some of the demo providers, a demo client account, a few open opportunities
+     * and two proposals. Does nothing unless the demo providers exist and both areas are still empty.
+     */
+    public static function seedCommerceDemo(PDO $pdo, ?string $demoPassword = null): void
+    {
+        $providerIds = [];
+        foreach ($pdo->query('SELECT id, slug, user_id FROM providers')->fetchAll() as $row) {
+            $providerIds[(string) $row['slug']] = [(int) $row['id'], (int) $row['user_id']];
+        }
+        foreach (['pearl-lens-studios', 'nile-savour-catering', 'nakasero-atelier-bespoke', 'cranecraft-digital-studio'] as $needed) {
+            if (!isset($providerIds[$needed])) {
+                return;
+            }
+        }
+        if ((int) $pdo->query('SELECT COUNT(*) FROM products')->fetchColumn() > 0
+            || (int) $pdo->query('SELECT COUNT(*) FROM opportunities')->fetchColumn() > 0) {
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $cat = static function (string $table, string $slug) use ($pdo): ?int {
+            $stmt = $pdo->prepare("SELECT id FROM {$table} WHERE slug = :slug LIMIT 1");
+            $stmt->execute([':slug' => $slug]);
+            $id = $stmt->fetchColumn();
+            return $id === false ? null : (int) $id;
+        };
+
+        // [provider slug, product category, name, slug, description, UGX, unit, condition, stock, image]
+        $products = [
+            ['nakasero-atelier-bespoke', 'fashion-textiles', 'Kitenge Shirt, Ready to Wear', 'kitenge-shirt-ready-to-wear',
+                "A tailored short-sleeve shirt cut from bold East African kitenge. Sizes S to XXL in stock; send your measurements for a custom fit.\n\nMachine washable. Colours vary slightly by batch.", 95000, 'each', 'new', 'in_stock', 'uploads/seed/portfolio-fashion-kampala.jpg'],
+            ['nakasero-atelier-bespoke', 'fashion-textiles', 'Gomesi Fabric Set (6 yards)', 'gomesi-fabric-set-6-yards',
+                'Six yards of gomesi-grade fabric with matching sash material, cut from a single bolt so the colour matches.', 180000, 'per set', 'new', 'low_stock', null],
+            ['nile-savour-catering', 'food-groceries', 'Mt. Elgon Arabica Coffee, 500 g', 'mt-elgon-arabica-coffee-500g',
+                'Medium-roast whole beans from smallholder farms on Mt. Elgon. Roasted to order in Jinja and packed the same week.', 28000, 'each', 'new', 'in_stock', 'uploads/seed/portfolio-product-coffee.jpg'],
+            ['nile-savour-catering', 'food-groceries', 'Jinja Wild Honey, 1 kg', 'jinja-wild-honey-1kg',
+                'Raw, unblended honey from hives along the Nile. Sold in a reusable glass jar.', 32000, 'each', 'new', 'in_stock', null],
+            ['pearl-lens-studios', 'art-crafts-gifts', 'Framed Lakeside Print, 16 × 20 in', 'framed-lakeside-print-16x20',
+                'A limited-edition print from our Lakeside Golden-Hour series, printed on archival paper and framed in locally made hardwood.', 220000, 'each', 'new', 'made_to_order', 'uploads/seed/portfolio-wedding-uganda.jpg'],
+            ['lakebreeze-wedding-films', 'art-crafts-gifts', 'Hardcover Wedding Album, 30 Pages', 'hardcover-wedding-album-30-pages',
+                'A lay-flat hardcover album designed from your gallery, with up to 90 photographs. Allow two weeks.', 350000, 'each', 'new', 'made_to_order', null],
+            ['kato-visuals', 'electronics-phones', 'Continuous LED Lighting Kit (used)', 'continuous-led-lighting-kit-used',
+                'Two 60 W LED panels with stands and a carry bag. Used for a year in the studio, all working.', 450000, 'per set', 'used', 'low_stock', null],
+            ['cranecraft-digital-studio', 'books-office', 'Branded Notebook Set, 10 pieces', 'branded-notebook-set-10-pieces',
+                'A5 notebooks printed with your logo on the cover. Minimum order ten; send your artwork or we design it.', 150000, 'per set', 'new', 'made_to_order', null],
+        ];
+
+        $prodStmt = $pdo->prepare(
+            'INSERT INTO products (provider_id, category_id, name, slug, description, price_ugx, price_unit, item_condition, stock_status, status, views_count, created_at, updated_at)
+             VALUES (:pid, :cid, :name, :slug, :desc, :price, :unit, :cond, :stock, \'active\', 0, :created, :updated)'
+        );
+        $imgStmt = $pdo->prepare('INSERT INTO product_images (product_id, image_path, sort_order) VALUES (:pid, :img, 0)');
+        foreach ($products as [$providerSlug, $catSlug, $name, $slug, $desc, $price, $unit, $cond, $stock, $image]) {
+            $categoryId = $cat('product_categories', $catSlug);
+            if (!isset($providerIds[$providerSlug]) || $categoryId === null) {
+                continue;
+            }
+            $prodStmt->execute([
+                ':pid' => $providerIds[$providerSlug][0], ':cid' => $categoryId, ':name' => $name, ':slug' => $slug,
+                ':desc' => $desc, ':price' => $price, ':unit' => $unit, ':cond' => $cond, ':stock' => $stock,
+                ':created' => $now, ':updated' => $now,
+            ]);
+            if ($image !== null) {
+                $imgStmt->execute([':pid' => (int) $pdo->lastInsertId(), ':img' => $image]);
+            }
+        }
+
+        // A demo client, so the "client posts a request" side can be tried without registering.
+        $clientId = null;
+        $existing = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+        $existing->execute([':email' => 'client@kopii.online']);
+        $found = $existing->fetchColumn();
+        if ($found !== false) {
+            $clientId = (int) $found;
+        } else {
+            $pdo->prepare(
+                'INSERT INTO users (full_name, email, phone, password_hash, role, email_verified_at, created_at)
+                 VALUES (:name, :email, :phone, :hash, :role, :verified, :created)'
+            )->execute([
+                ':name' => 'Grace Atim', ':email' => 'client@kopii.online', ':phone' => '+256772300400',
+                ':hash' => password_hash($demoPassword ?? 'KopiiDemo2026!', PASSWORD_DEFAULT),
+                ':role' => 'client', ':verified' => $now, ':created' => $now,
+            ]);
+            $clientId = (int) $pdo->lastInsertId();
+        }
+
+        $day = static fn(int $n): string => date('Y-m-d', strtotime('+' . $n . ' days'));
+        // [poster user id, service category slug|null, kind, title, description, min, max, city, closes_on]
+        $opportunities = [
+            [$clientId, 'photography-video', 'project', 'Photographer for a 200-guest Kwanjula in Gulu',
+                "We are holding a Kwanjula in Gulu next month and need a photographer (and a second shooter if possible) for the full day, from the morning preparations to the evening reception.\n\nPlease send examples of similar events and say whether you can travel from Kampala.", 1500000, 2500000, 'Gulu', $day(21)],
+            [$clientId, 'graphic-web-design', 'project', 'Logo and brand kit for a new bakery',
+                'A neighbourhood bakery opening in Ntinda needs a logo, a colour palette, a label for cake boxes and a simple price-list design. Print-ready files, please.', 500000, 900000, 'Kampala', $day(14)],
+            [$providerIds['nile-savour-catering'][1], 'photography-video', 'job', 'Event photographer, weekend shifts (Jinja)',
+                "Nile Savour Catering & Events is looking for a reliable photographer for weekend events around Jinja and Mbale, April to December. You bring your own camera; we cover transport.\n\nPay is per event, roughly UGX 600,000 to 800,000 a month.", 600000, 800000, 'Jinja', $day(30)],
+            [$providerIds['nakasero-atelier-bespoke'][1], null, 'supply', '300 metres of kitenge fabric for a uniform order',
+                'We need 300 metres of good-quality kitenge in two matching colourways, delivered to Kampala within three weeks. Send your price per metre, available colours and delivery terms.', 3000000, 4500000, 'Kampala', $day(10)],
+            [$providerIds['nile-savour-catering'][1], 'software-it', 'tender', 'Website with online ordering for a restaurant',
+                'A simple, fast website for our restaurant with a menu, photo gallery and an order-by-WhatsApp button. We will supply the photos and text.', 2000000, 4000000, 'Jinja', $day(25)],
+        ];
+
+        $oppStmt = $pdo->prepare(
+            'INSERT INTO opportunities (user_id, category_id, kind, title, description, budget_min_ugx, budget_max_ugx, city, closes_on, status, views_count, created_at, updated_at)
+             VALUES (:uid, :cid, :kind, :title, :desc, :min, :max, :city, :closes, \'open\', 0, :created, :updated)'
+        );
+        $oppIds = [];
+        foreach ($opportunities as [$uid, $catSlug, $kind, $title, $desc, $min, $max, $city, $closes]) {
+            $oppStmt->execute([
+                ':uid' => $uid, ':cid' => $catSlug !== null ? $cat('categories', $catSlug) : null, ':kind' => $kind,
+                ':title' => $title, ':desc' => $desc, ':min' => $min, ':max' => $max, ':city' => $city,
+                ':closes' => $closes, ':created' => $now, ':updated' => $now,
+            ]);
+            $oppIds[] = (int) $pdo->lastInsertId();
+        }
+
+        $respStmt = $pdo->prepare(
+            'INSERT INTO opportunity_responses (opportunity_id, provider_id, message, quote_ugx, timeline, status, created_at)
+             VALUES (:oid, :pid, :msg, :quote, :timeline, :status, :created)'
+        );
+        $respStmt->execute([
+            ':oid' => $oppIds[0], ':pid' => $providerIds['pearl-lens-studios'][0],
+            ':msg' => 'We shoot Kwanjula and introduction ceremonies across Uganda and have covered several in Gulu. Our quote covers two photographers for the full day, with a gallery within ten days. Happy to share a full album from a similar event.',
+            ':quote' => 2200000, ':timeline' => 'Gallery in 10 days', ':status' => 'new', ':created' => $now,
+        ]);
+        $respStmt->execute([
+            ':oid' => $oppIds[1], ':pid' => $providerIds['cranecraft-digital-studio'][0],
+            ':msg' => 'We can deliver the logo, a colour palette, box labels and a price-list layout as print-ready files. Two rounds of changes are included.',
+            ':quote' => 750000, ':timeline' => '10 days', ':status' => 'shortlisted', ':created' => $now,
+        ]);
     }
 
     /**

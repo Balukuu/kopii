@@ -2,7 +2,7 @@
 defined('KOPII_APP') or exit('Direct access denied.');
 /**
  * @var array $attention pending_reviews, unverified_providers, unconfirmed_emails
- * @var array $week      accounts, listings, inquiries, reviews (last 7 days)
+ * @var array $week      accounts, listings, products, opportunities, proposals, inquiries, reviews (last 7 days)
  * @var array $stats     providers, portfolios, cities, reviews
  * @var int   $hidden    listings that are not public
  * @var array $recent    latest admin_log rows
@@ -47,7 +47,19 @@ $allClear = (int) $attention['pending_reviews'] === 0 && (int) $attention['unver
                 <strong class="tnum"><?= (int) $week['listings'] ?></strong>
             </div>
             <div class="kpi-card">
-                <span>Quote requests</span>
+                <span>New products</span>
+                <strong class="tnum"><?= (int) $week['products'] ?></strong>
+            </div>
+            <div class="kpi-card">
+                <span>New opportunities</span>
+                <strong class="tnum"><?= (int) $week['opportunities'] ?></strong>
+            </div>
+            <div class="kpi-card">
+                <span>Proposals sent</span>
+                <strong class="tnum"><?= (int) $week['proposals'] ?></strong>
+            </div>
+            <div class="kpi-card">
+                <span>Quote requests &amp; enquiries</span>
                 <strong class="tnum"><?= (int) $week['inquiries'] ?></strong>
             </div>
             <div class="kpi-card">

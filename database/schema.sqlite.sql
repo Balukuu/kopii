@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS inquiries (
     project_details TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'new',
     provider_notes TEXT DEFAULT NULL,
+    product_id INTEGER DEFAULT NULL,
+    product_name TEXT DEFAULT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
 );
@@ -169,3 +171,86 @@ CREATE TABLE IF NOT EXISTS admin_log (
 
 CREATE INDEX IF NOT EXISTS idx_admin_log_created ON admin_log (created_at);
 CREATE INDEX IF NOT EXISTS idx_admin_log_target ON admin_log (target_type, target_id);
+
+-- The shop. Products belong to a provider profile (a freelancer or a business) and are bought by
+-- contacting the seller: an enquiry goes into the same inbox as quote requests (inquiries.product_id).
+CREATE TABLE IF NOT EXISTS product_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    icon TEXT NOT NULL DEFAULT 'briefcase',
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    description TEXT DEFAULT NULL,
+    price_ugx INTEGER NOT NULL DEFAULT 0,
+    price_unit TEXT NOT NULL DEFAULT 'each',
+    item_condition TEXT NOT NULL DEFAULT 'new',
+    stock_status TEXT NOT NULL DEFAULT 'in_stock',
+    status TEXT NOT NULL DEFAULT 'active',
+    views_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES product_categories(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_products_provider ON products (provider_id, status);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products (category_id, status);
+
+CREATE TABLE IF NOT EXISTS product_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    image_path TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images (product_id, sort_order);
+
+-- The opportunities board. Anyone with a confirmed email can post what they need; providers answer
+-- with a proposal. The poster's contact details are never shown publicly: proposals reach them
+-- through the dashboard and by email.
+CREATE TABLE IF NOT EXISTS opportunities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    category_id INTEGER DEFAULT NULL,
+    kind TEXT NOT NULL DEFAULT 'project',
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    budget_min_ugx INTEGER DEFAULT NULL,
+    budget_max_ugx INTEGER DEFAULT NULL,
+    city TEXT NOT NULL DEFAULT 'Kampala',
+    closes_on TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    views_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_opportunities_board ON opportunities (status, closes_on);
+CREATE INDEX IF NOT EXISTS idx_opportunities_user ON opportunities (user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS opportunity_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    opportunity_id INTEGER NOT NULL,
+    provider_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    quote_ugx INTEGER DEFAULT NULL,
+    timeline TEXT DEFAULT NULL,
+    status TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL,
+    UNIQUE (opportunity_id, provider_id),
+    FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE CASCADE,
+    FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_opportunity_responses_provider ON opportunity_responses (provider_id, created_at);

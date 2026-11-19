@@ -48,6 +48,9 @@ final class AdminModel
         return [
             'accounts'  => $count("SELECT COUNT(*) FROM users WHERE role <> 'admin' AND created_at >= :since"),
             'listings'  => $count('SELECT COUNT(*) FROM providers WHERE created_at >= :since'),
+            'products'      => $count('SELECT COUNT(*) FROM products WHERE created_at >= :since'),
+            'opportunities' => $count('SELECT COUNT(*) FROM opportunities WHERE created_at >= :since'),
+            'proposals'     => $count('SELECT COUNT(*) FROM opportunity_responses WHERE created_at >= :since'),
             'inquiries' => $count('SELECT COUNT(*) FROM inquiries WHERE created_at >= :since'),
             'reviews'   => $count('SELECT COUNT(*) FROM reviews WHERE created_at >= :since'),
         ];

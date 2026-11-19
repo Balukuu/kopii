@@ -24,10 +24,13 @@ final class Notifier
             $clientName  = self::limit((string) ($lead['client_name'] ?? ''), 80);
             $clientPhone = trim((string) ($lead['client_phone'] ?? ''));
 
+            $productName = trim((string) ($lead['product_name'] ?? ''));
             $lines = [
                 'Hi ' . self::firstName((string) $target['owner_name']) . ',',
                 '',
-                'You have a new quote request for ' . $target['business_name'] . ' on Kopii.',
+                $productName !== ''
+                    ? 'Someone is interested in "' . self::limit($productName, 120) . '" from the ' . $target['business_name'] . ' shop on Kopii.'
+                    : 'You have a new quote request for ' . $target['business_name'] . ' on Kopii.',
                 '',
                 'From:   ' . $clientName,
                 'Phone:  ' . $clientPhone,
@@ -37,7 +40,7 @@ final class Notifier
                 $lines[] = 'Date:   ' . self::limit((string) $lead['event_date'], 60);
             }
             if (!empty($lead['event_location'])) {
-                $lines[] = 'Where:  ' . self::limit((string) $lead['event_location'], 120);
+                $lines[] = ($productName !== '' ? 'Deliver to: ' : 'Where:  ') . self::limit((string) $lead['event_location'], 120);
             }
             if (!empty($lead['budget_ugx'])) {
                 $lines[] = 'Budget: ' . format_ugx((int) $lead['budget_ugx']);
@@ -58,7 +61,7 @@ final class Notifier
 
             Mailer::send(
                 (string) $target['email'],
-                'New quote request from ' . $clientName . ' — Kopii',
+                ($productName !== '' ? 'Enquiry about ' . self::limit($productName, 60) : 'New quote request from ' . $clientName) . ' — Kopii',
                 implode("\n", $lines),
                 (string) ($lead['client_email'] ?? '')
             );
@@ -241,6 +244,120 @@ final class Notifier
             }
         } catch (Throwable $e) {
             error_log('[Kopii] pending review alert failed: ' . $e->getMessage());
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Opportunities
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * Tell the person who posted an opportunity that a provider has sent a proposal. Reply-To is the
+     * provider's account email, so replying goes straight to them.
+     *
+     * @param array $opportunity row from OpportunityModel::find(): id, title, poster_name, poster_email
+     * @param array $provider    business_name, slug, phone, public_email
+     * @param array $response    message, quote_ugx, timeline
+     */
+    public static function newProposal(array $opportunity, array $provider, array $response, string $replyTo = ''): void
+    {
+        try {
+            $lines = [
+                'Hi ' . self::firstName((string) ($opportunity['poster_name'] ?? '')) . ',',
+                '',
+                $provider['business_name'] . ' sent a proposal for your opportunity "' . self::limit((string) $opportunity['title'], 120) . '" on Kopii.',
+                '',
+            ];
+            if (!empty($response['quote_ugx'])) {
+                $lines[] = 'Their price: ' . format_ugx((int) $response['quote_ugx']);
+            }
+            if (!empty($response['timeline'])) {
+                $lines[] = 'Timeline:    ' . self::limit((string) $response['timeline'], 80);
+            }
+            $lines[] = '';
+            $lines[] = 'Their message:';
+            $lines[] = self::limit((string) ($response['message'] ?? ''), 1500);
+            $lines[] = '';
+            $lines[] = 'See their profile: ' . absolute_url('/provider/' . $provider['slug']);
+            $lines[] = 'Review every proposal: ' . absolute_url('/dashboard/opportunities/' . (int) $opportunity['id']);
+
+            Mailer::send(
+                (string) $opportunity['poster_email'],
+                'New proposal from ' . $provider['business_name'] . ' — Kopii',
+                implode("\n", $lines),
+                $replyTo
+            );
+        } catch (Throwable $e) {
+            error_log('[Kopii] proposal notification failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Tell a provider what happened to their proposal. Only shortlisted and hired are sent: a decline
+     * is better delivered by the poster than by an automatic email.
+     *
+     * @param array $response row from OpportunityModel::findResponseForPoster()
+     */
+    public static function proposalUpdated(array $response, string $status): void
+    {
+        try {
+            if (!in_array($status, [OpportunityModel::SHORTLISTED, OpportunityModel::HIRED], true)) {
+                return;
+            }
+            $headline = $status === OpportunityModel::HIRED
+                ? 'You were chosen for "' . self::limit((string) $response['opportunity_title'], 120) . '".'
+                : 'You are on the shortlist for "' . self::limit((string) $response['opportunity_title'], 120) . '".';
+
+            $body = implode("\n", [
+                'Hi ' . self::firstName((string) ($response['provider_owner_name'] ?? '')) . ',',
+                '',
+                $headline,
+                'The person who posted it can now contact you using the details on your ' . $response['business_name'] . ' listing.',
+                '',
+                'Your proposals: ' . absolute_url('/dashboard/opportunities', ['tab' => 'proposals']),
+            ]);
+            Mailer::send(
+                (string) $response['provider_email'],
+                ($status === OpportunityModel::HIRED ? 'You were chosen' : 'You were shortlisted') . ' — Kopii',
+                $body
+            );
+        } catch (Throwable $e) {
+            error_log('[Kopii] proposal update email failed: ' . $e->getMessage());
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Admin moderation of products and opportunities
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * Tell someone an administrator took their product or opportunity down, or put it back.
+     *
+     * @param string $kind   'product' or 'opportunity'
+     * @param string $reason shown to the person when taking it down
+     */
+    public static function contentModerated(string $toEmail, string $toName, string $kind, string $title, bool $removed, string $reason = ''): void
+    {
+        try {
+            $lines = ['Hi ' . self::firstName($toName) . ',', ''];
+            if ($removed) {
+                $lines[] = 'The Kopii team has hidden your ' . $kind . ' "' . self::limit($title, 120) . '". It is no longer visible to the public.';
+                if (trim($reason) !== '') {
+                    $lines[] = '';
+                    $lines[] = 'Reason: ' . trim($reason);
+                }
+                $lines[] = '';
+                $lines[] = self::contactLine();
+            } else {
+                $lines[] = 'Your ' . $kind . ' "' . self::limit($title, 120) . '" is visible on Kopii again.';
+            }
+            Mailer::send(
+                $toEmail,
+                $removed ? 'Your ' . $kind . ' has been hidden — Kopii' : 'Your ' . $kind . ' is visible again — Kopii',
+                implode("\n", $lines)
+            );
+        } catch (Throwable $e) {
+            error_log('[Kopii] moderation email failed: ' . $e->getMessage());
         }
     }
 

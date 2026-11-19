@@ -38,6 +38,12 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
             <a class="dash-tab" href="<?= e(route_url('/dashboard', ['tab' => 'packages'])) ?>"<?= $tab === 'packages' ? ' aria-current="page"' : '' ?>>
                 <?= svg_icon('layers', 16) ?> UGX Packages (<?= count($packages) ?>)
             </a>
+            <a class="dash-tab" href="<?= e(route_url('/dashboard', ['tab' => 'products'])) ?>"<?= $tab === 'products' ? ' aria-current="page"' : '' ?>>
+                <?= svg_icon('home', 16) ?> Shop Products (<?= count($products) ?>)
+            </a>
+            <a class="dash-tab" href="<?= e(route_url('/dashboard/opportunities')) ?>">
+                <?= svg_icon('search', 16) ?> Opportunities<?php if ($newProposals > 0): ?> <span class="tab-count tnum"><?= (int) $newProposals ?><span class="visually-hidden"> new proposals</span></span><?php endif; ?>
+            </a>
             <a class="dash-tab" href="<?= e(route_url('/dashboard', ['tab' => 'profile'])) ?>"<?= $tab === 'profile' ? ' aria-current="page"' : '' ?>>
                 Profile &amp; Branding
             </a>
@@ -174,6 +180,9 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                             </div>
 
                             <div style="display:flex; flex-wrap:wrap; gap:0.85rem; margin-block-end:0.75rem; font-size:0.86rem;">
+                                <?php if (!empty($inq['product_name'])): ?>
+                                    <span class="tag-chip">Product: <?= e($inq['product_name']) ?></span>
+                                <?php endif; ?>
                                 <?php if (!empty($inq['package_name'])): ?>
                                     <span class="tag-chip">Selected Package: <?= e($inq['package_name']) ?></span>
                                 <?php endif; ?>
@@ -181,7 +190,7 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                                     <span class="tag-chip">Target Date: <?= e($inq['event_date']) ?></span>
                                 <?php endif; ?>
                                 <?php if (!empty($inq['event_location'])): ?>
-                                    <span class="tag-chip">Location: <?= e($inq['event_location']) ?></span>
+                                    <span class="tag-chip"><?= !empty($inq['product_name']) ? 'Deliver to' : 'Location' ?>: <?= e($inq['event_location']) ?></span>
                                 <?php endif; ?>
                                 <?php if (!empty($inq['budget_ugx'])): ?>
                                     <span class="tag-chip">Client Budget: <?= e(format_ugx($inq['budget_ugx'])) ?></span>
@@ -355,6 +364,160 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                             <label for="pkg-pop">Highlight as "Most Popular Choice"</label>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">Add Package</button>
+                    </form>
+                </aside>
+            </div>
+
+        <?php elseif ($tab === 'products'): ?>
+            <?php
+            $f = static fn(string $key, mixed $fallback = '') => $editing !== null ? ($editing[$key] ?? $fallback) : $fallback;
+            $val = static fn(string $key, mixed $fallback = '') => old($key, (string) $f($key, $fallback));
+            $editId = $editing !== null ? (int) $editing['id'] : 0;
+            $slots  = $maxImages - ($editing !== null ? count($editing['images']) : 0);
+            ?>
+            <div class="profile-layout">
+                <div>
+                    <div class="content-panel">
+                        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:0.75rem; margin-block-end:1.1rem;">
+                            <h2 class="m-0">Your shop products (<?= count($products) ?>)</h2>
+                            <a href="<?= e(route_url('/shop')) ?>" class="btn btn-outline btn-sm"><?= svg_icon('globe', 16) ?> View the shop</a>
+                        </div>
+                        <?php if (empty($products)): ?>
+                            <p class="text-muted m-0">List what you sell: photos, a price in UGX and a short description. Buyers message you straight from the product page, and their messages land in your Client Leads inbox.</p>
+                        <?php else: ?>
+                            <?php foreach ($products as $prod): ?>
+                                <?php
+                                [$stockLabel, $stockClass] = stock_badge((string) $prod['stock_status']);
+                                $statusLabel = ['active' => 'Live', 'paused' => 'Paused', 'suspended' => 'Hidden by Kopii'][$prod['status']] ?? ucfirst((string) $prod['status']);
+                                ?>
+                                <div class="product-row">
+                                    <div class="product-row-thumb">
+                                        <?php if (!empty($prod['cover_path'])): ?>
+                                            <img src="<?= e(thumb_url($prod['cover_path'])) ?>" alt="" width="160" height="160" loading="lazy">
+                                        <?php else: ?>
+                                            <?= svg_icon('image', 24) ?>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div>
+                                        <div class="card-badges" style="margin-block-end:0.3rem;">
+                                            <span class="badge <?= $prod['status'] === 'active' ? 'badge-avail' : ($prod['status'] === 'suspended' ? 'badge-out' : 'badge-type') ?>"><?= e($statusLabel) ?></span>
+                                            <span class="badge <?= e($stockClass) ?>"><?= e($stockLabel) ?></span>
+                                        </div>
+                                        <h3><?= e($prod['name']) ?></h3>
+                                        <div class="text-muted" style="font-size:0.88rem;">
+                                            <strong class="tnum" style="color:var(--ink);"><?= e(product_price($prod['price_ugx'])) ?></strong>
+                                            <?= (int) $prod['price_ugx'] > 0 && $prod['price_unit'] !== 'each' ? ' ' . e($prod['price_unit']) : '' ?>
+                                            &middot; <?= e($prod['category_name']) ?>
+                                            &middot; <?= (int) $prod['views_count'] ?> views
+                                            &middot; <?= (int) $prod['enquiry_count'] ?> <?= (int) $prod['enquiry_count'] === 1 ? 'enquiry' : 'enquiries' ?>
+                                        </div>
+                                        <div class="product-row-actions">
+                                            <a class="btn btn-outline btn-sm" href="<?= e(route_url('/dashboard', ['tab' => 'products', 'edit' => (string) (int) $prod['id']])) ?>">Edit</a>
+                                            <a class="btn btn-outline btn-sm" href="<?= e(route_url('/product/' . $prod['slug'])) ?>">View</a>
+                                            <?php if ($prod['status'] !== 'suspended'): ?>
+                                                <form method="POST" action="<?= e(route_url('/dashboard/products/status')) ?>">
+                                                    <?= csrf_field() ?>
+                                                    <input type="hidden" name="product_id" value="<?= (int) $prod['id'] ?>">
+                                                    <input type="hidden" name="status" value="<?= $prod['status'] === 'active' ? 'paused' : 'active' ?>">
+                                                    <button type="submit" class="btn btn-outline btn-sm"><?= $prod['status'] === 'active' ? 'Pause' : 'List again' ?></button>
+                                                </form>
+                                            <?php endif; ?>
+                                            <form method="POST" action="<?= e(route_url('/dashboard/products/delete')) ?>" data-confirm="Yes, delete">
+                                                <?= csrf_field() ?>
+                                                <input type="hidden" name="product_id" value="<?= (int) $prod['id'] ?>">
+                                                <button type="submit" class="btn btn-danger-outline btn-sm"><?= svg_icon('trash', 16) ?> Delete</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <aside class="content-panel">
+                    <h2><?= $editing !== null ? 'Edit product' : 'Add a product' ?></h2>
+                    <form method="POST" action="<?= e(route_url('/dashboard/products/save')) ?>" enctype="multipart/form-data" class="stack-form">
+                        <?= csrf_field() ?>
+                        <?php if ($editing !== null): ?>
+                            <input type="hidden" name="product_id" value="<?= $editId ?>">
+                        <?php endif; ?>
+
+                        <div class="field">
+                            <label for="pd-name">Product name *</label>
+                            <input type="text" id="pd-name" name="name" value="<?= e($val('name')) ?>" maxlength="160" required placeholder="e.g. Mt. Elgon Arabica Coffee, 500 g">
+                        </div>
+                        <div class="field">
+                            <label for="pd-cat">Category *</label>
+                            <select id="pd-cat" name="category_id" required>
+                                <option value="">Choose a category</option>
+                                <?php foreach ($productCategories as $cat): ?>
+                                    <option value="<?= (int) $cat['id'] ?>"<?= (int) $val('category_id', '0') === (int) $cat['id'] ? ' selected' : '' ?>><?= e($cat['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="form-row-2">
+                            <div class="field">
+                                <label for="pd-price">Price (UGX)</label>
+                                <input type="text" inputmode="numeric" id="pd-price" name="price_ugx" value="<?= e($val('price_ugx') === '0' ? '' : $val('price_ugx')) ?>" placeholder="Ask for price">
+                            </div>
+                            <div class="field">
+                                <label for="pd-unit">Price is</label>
+                                <select id="pd-unit" name="price_unit">
+                                    <?php foreach ($productUnits as $u): ?>
+                                        <option value="<?= e($u) ?>"<?= $val('price_unit', 'each') === $u ? ' selected' : '' ?>><?= e($u) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row-2">
+                            <div class="field">
+                                <label for="pd-stock">Availability</label>
+                                <select id="pd-stock" name="stock_status">
+                                    <?php foreach ($stockStatuses as $key => $label): ?>
+                                        <option value="<?= e($key) ?>"<?= $val('stock_status', 'in_stock') === $key ? ' selected' : '' ?>><?= e($label) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="pd-cond">Condition</label>
+                                <select id="pd-cond" name="item_condition">
+                                    <?php foreach ($productConditions as $key => $label): ?>
+                                        <option value="<?= e($key) ?>"<?= $val('item_condition', 'new') === $key ? ' selected' : '' ?>><?= e($label) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="pd-desc">Description</label>
+                            <textarea id="pd-desc" name="description" rows="5" maxlength="2000" placeholder="Size, materials, what is included, delivery options..."><?= e($val('description')) ?></textarea>
+                        </div>
+
+                        <?php if ($editing !== null && !empty($editing['images'])): ?>
+                            <div class="field">
+                                <span class="label-strong" style="font-weight:600;">Current photos</span>
+                                <div class="photo-strip">
+                                    <?php foreach ($editing['images'] as $img): ?>
+                                        <figure>
+                                            <img src="<?= e(thumb_url($img['image_path'])) ?>" alt="" width="160" height="160" loading="lazy">
+                                            <button type="submit" class="btn btn-danger-outline btn-sm" formaction="<?= e(route_url('/dashboard/products/image/delete')) ?>" formnovalidate name="image_id" value="<?= (int) $img['id'] ?>">Remove</button>
+                                        </figure>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($slots > 0): ?>
+                            <div class="field">
+                                <label for="pd-photos"><?= $editing !== null ? 'Add photos' : 'Photos' ?> (JPG, PNG or WebP, up to <?= (int) $slots ?> more)</label>
+                                <input type="file" id="pd-photos" name="product_images[]" accept="image/jpeg,image/png,image/webp" multiple>
+                            </div>
+                        <?php endif; ?>
+
+                        <button type="submit" class="btn btn-primary btn-block"><?= $editing !== null ? 'Save changes' : 'Add to my shop' ?></button>
+                        <?php if ($editing !== null): ?>
+                            <a class="btn btn-outline btn-block" href="<?= e(route_url('/dashboard', ['tab' => 'products'])) ?>">Cancel</a>
+                        <?php endif; ?>
                     </form>
                 </aside>
             </div>

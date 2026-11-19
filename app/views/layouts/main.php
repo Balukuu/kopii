@@ -51,6 +51,12 @@ $curRoute = $currentRoute ?? '/';
                         <a class="nav-link" href="<?= e(route_url('/explore', ['tab' => 'work'])) ?>"<?= ($curRoute === '/explore' && ($_GET['tab'] ?? '') === 'work') ? ' aria-current="page"' : '' ?>>Clients</a>
                     </li>
                     <li>
+                        <a class="nav-link" href="<?= e(route_url('/shop')) ?>"<?= $curRoute === '/shop' ? ' aria-current="page"' : '' ?>>Shop</a>
+                    </li>
+                    <li>
+                        <a class="nav-link" href="<?= e(route_url('/opportunities')) ?>"<?= $curRoute === '/opportunities' ? ' aria-current="page"' : '' ?>>Opportunities</a>
+                    </li>
+                    <li>
                         <a class="nav-link" href="<?= e(route_url('/about')) ?>"<?= $curRoute === '/about' ? ' aria-current="page"' : '' ?>>About Us</a>
                     </li>
 
@@ -200,6 +206,8 @@ $curRoute = $currentRoute ?? '/';
                         <li><a href="<?= e(route_url('/explore', ['tab' => 'work'])) ?>">Client Case Studies</a></li>
                         <li><a href="<?= e(route_url('/explore')) ?>">Browse All Studios</a></li>
                         <li><a href="<?= e(route_url('/hire')) ?>">Guided Talent Matching</a></li>
+                        <li><a href="<?= e(route_url('/shop')) ?>">Shop Products</a></li>
+                        <li><a href="<?= e(route_url('/opportunities')) ?>">Opportunities Board</a></li>
                     </ul>
                 </div>
                 <div>
@@ -207,6 +215,7 @@ $curRoute = $currentRoute ?? '/';
                     <ul class="footer-links">
                         <li><a href="<?= e(route_url('/hire')) ?>">Get matched</a></li>
                         <li><a href="<?= e(route_url('/register')) ?>">Apply as a Freelancer / Studio</a></li>
+                        <li><a href="<?= e(route_url('/opportunities/new')) ?>">Post an Opportunity</a></li>
                         <li><a href="<?= e(route_url('/login')) ?>">Talent &amp; Client Log In</a></li>
                     </ul>
                 </div>

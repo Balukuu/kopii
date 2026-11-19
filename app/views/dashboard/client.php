@@ -8,7 +8,29 @@ defined('KOPII_APP') or exit('Direct access denied.');
                 <h1 style="margin:0; font-size:1.85rem; color:var(--navy-900);">Hello, <?= e($user['full_name']) ?></h1>
                 <p class="text-muted">Track your sent quote requests or launch a Freelancer / Business Showcase profile anytime.</p>
             </div>
-            <a href="<?= e(route_url('/explore')) ?>" class="btn btn-outline">Browse providers</a>
+            <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+                <a href="<?= e(route_url('/explore')) ?>" class="btn btn-outline">Browse providers</a>
+                <a href="<?= e(route_url('/shop')) ?>" class="btn btn-outline">Shop products</a>
+            </div>
+        </div>
+
+        <div class="board-cta" style="margin-block-end:1.5rem;">
+            <div>
+                <h2 style="font-size:var(--text-lg);">Need something done?</h2>
+                <p>
+                    <?php if ($myOpportunities > 0): ?>
+                        You have posted <?= (int) $myOpportunities ?> <?= $myOpportunities === 1 ? 'opportunity' : 'opportunities' ?><?= $newProposals > 0 ? ', with ' . (int) $newProposals . ' new ' . ($newProposals === 1 ? 'proposal' : 'proposals') . ' waiting' : '' ?>.
+                    <?php else: ?>
+                        Post a project, job, tender or supply request and providers send you proposals.
+                    <?php endif; ?>
+                </p>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+                <?php if ($myOpportunities > 0): ?>
+                    <a class="btn btn-outline" href="<?= e(route_url('/dashboard/opportunities')) ?>">My opportunities</a>
+                <?php endif; ?>
+                <a class="btn btn-primary" href="<?= e(route_url('/opportunities/new')) ?>">Post an opportunity</a>
+            </div>
         </div>
 
         <?php if (empty($emailVerified)): ?>
@@ -36,6 +58,16 @@ defined('KOPII_APP') or exit('Direct access denied.');
                                 <a href="<?= e(route_url('/provider/' . $inq['provider_slug'])) ?>"><strong><?= e($inq['business_name']) ?></strong></a>
                                 <span class="badge badge-type"><?= e(ucfirst((string) $inq['status'])) ?></span>
                             </div>
+                            <?php if (!empty($inq['product_name'])): ?>
+                                <p style="margin:0 0 0.4rem; font-size:0.86rem;" class="text-muted">
+                                    About:
+                                    <?php if (!empty($inq['product_slug'])): ?>
+                                        <a href="<?= e(route_url('/product/' . $inq['product_slug'])) ?>"><?= e($inq['product_name']) ?></a>
+                                    <?php else: ?>
+                                        <?= e($inq['product_name']) ?>
+                                    <?php endif; ?>
+                                </p>
+                            <?php endif; ?>
                             <p style="margin:0 0 0.5rem; font-size:0.92rem;"><?= e($inq['project_details']) ?></p>
                             <a href="<?= e(whatsapp_url((string) $inq['provider_whatsapp'], 'Hi ' . $inq['business_name'] . ', following up on my Kopii inquiry!')) ?>" target="_blank" rel="noopener" class="btn btn-whatsapp btn-sm">
                                 <?= svg_icon('whatsapp', 16) ?> Chat on WhatsApp

@@ -120,6 +120,8 @@ CREATE TABLE IF NOT EXISTS `inquiries` (
     `project_details` TEXT NOT NULL,
     `status` VARCHAR(20) NOT NULL DEFAULT 'new',
     `provider_notes` TEXT DEFAULT NULL,
+    `product_id` INT UNSIGNED DEFAULT NULL,
+    `product_name` VARCHAR(160) DEFAULT NULL,
     `created_at` DATETIME NOT NULL,
     PRIMARY KEY (`id`),
     KEY `idx_inquiries_provider_status` (`provider_id`, `status`, `created_at`),
@@ -195,6 +197,92 @@ CREATE TABLE IF NOT EXISTS `admin_log` (
     KEY `idx_admin_log_created` (`created_at`),
     KEY `idx_admin_log_target` (`target_type`, `target_id`),
     CONSTRAINT `fk_admin_log_user` FOREIGN KEY (`admin_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The shop. Products belong to a provider profile (a freelancer or a business) and are bought by
+-- contacting the seller: an enquiry goes into the same inbox as quote requests (inquiries.product_id).
+CREATE TABLE IF NOT EXISTS `product_categories` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `slug` VARCHAR(120) NOT NULL,
+    `icon` VARCHAR(40) NOT NULL DEFAULT 'briefcase',
+    `sort_order` INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_product_categories_slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `products` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `provider_id` INT UNSIGNED NOT NULL,
+    `category_id` INT UNSIGNED NOT NULL,
+    `name` VARCHAR(160) NOT NULL,
+    `slug` VARCHAR(190) NOT NULL,
+    `description` TEXT DEFAULT NULL,
+    `price_ugx` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `price_unit` VARCHAR(30) NOT NULL DEFAULT 'each',
+    `item_condition` VARCHAR(20) NOT NULL DEFAULT 'new',
+    `stock_status` VARCHAR(20) NOT NULL DEFAULT 'in_stock',
+    `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+    `views_count` INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL,
+    `updated_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_products_slug` (`slug`),
+    KEY `idx_products_provider` (`provider_id`, `status`),
+    KEY `idx_products_category` (`category_id`, `status`),
+    CONSTRAINT `fk_products_provider` FOREIGN KEY (`provider_id`) REFERENCES `providers` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `product_categories` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `product_images` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `product_id` INT UNSIGNED NOT NULL,
+    `image_path` VARCHAR(255) NOT NULL,
+    `sort_order` INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_product_images_product` (`product_id`, `sort_order`),
+    CONSTRAINT `fk_product_images_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The opportunities board. Anyone with a confirmed email can post what they need; providers answer
+-- with a proposal. The poster's contact details are never shown publicly: proposals reach them
+-- through the dashboard and by email.
+CREATE TABLE IF NOT EXISTS `opportunities` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `category_id` INT UNSIGNED DEFAULT NULL,
+    `kind` VARCHAR(12) NOT NULL DEFAULT 'project',
+    `title` VARCHAR(160) NOT NULL,
+    `description` TEXT NOT NULL,
+    `budget_min_ugx` BIGINT UNSIGNED DEFAULT NULL,
+    `budget_max_ugx` BIGINT UNSIGNED DEFAULT NULL,
+    `city` VARCHAR(60) NOT NULL DEFAULT 'Kampala',
+    `closes_on` DATE NOT NULL,
+    `status` VARCHAR(12) NOT NULL DEFAULT 'open',
+    `views_count` INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL,
+    `updated_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_opportunities_board` (`status`, `closes_on`),
+    KEY `idx_opportunities_user` (`user_id`, `created_at`),
+    CONSTRAINT `fk_opportunities_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_opportunities_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `opportunity_responses` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `opportunity_id` INT UNSIGNED NOT NULL,
+    `provider_id` INT UNSIGNED NOT NULL,
+    `message` TEXT NOT NULL,
+    `quote_ugx` BIGINT UNSIGNED DEFAULT NULL,
+    `timeline` VARCHAR(80) DEFAULT NULL,
+    `status` VARCHAR(12) NOT NULL DEFAULT 'new',
+    `created_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_opportunity_responses_pair` (`opportunity_id`, `provider_id`),
+    KEY `idx_opportunity_responses_provider` (`provider_id`, `created_at`),
+    CONSTRAINT `fk_opportunity_responses_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_opportunity_responses_provider` FOREIGN KEY (`provider_id`) REFERENCES `providers` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

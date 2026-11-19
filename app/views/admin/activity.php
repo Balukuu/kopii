@@ -2,7 +2,7 @@
 defined('KOPII_APP') or exit('Direct access denied.');
 /**
  * @var array  $entries admin_log rows
- * @var string $type    '' | provider | review | user
+ * @var string $type    '' | provider | product | opportunity | review | user
  * @var int    $page
  * @var int    $pages
  * @var int    $total
@@ -12,6 +12,8 @@ View::partial('admin_header', ['adminTab' => $adminTab]);
 $tabs = [
     ''         => 'Everything',
     'provider' => 'Listings',
+    'product'  => 'Products',
+    'opportunity' => 'Opportunities',
     'review'   => 'Reviews',
     'user'     => 'Accounts',
 ];

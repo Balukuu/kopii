@@ -95,6 +95,8 @@ require_once KOPII_ROOT . '/app/models/UserModel.php';
 require_once KOPII_ROOT . '/app/models/ReviewModel.php';
 require_once KOPII_ROOT . '/app/models/ProviderModel.php';
 require_once KOPII_ROOT . '/app/models/InquiryModel.php';
+require_once KOPII_ROOT . '/app/models/ProductModel.php';
+require_once KOPII_ROOT . '/app/models/OpportunityModel.php';
 require_once KOPII_ROOT . '/app/models/PasswordResetModel.php';
 require_once KOPII_ROOT . '/app/models/EmailVerificationModel.php';
 require_once KOPII_ROOT . '/app/models/AdminLogModel.php';
@@ -103,6 +105,9 @@ require_once KOPII_ROOT . '/app/models/AdminModel.php';
 require_once KOPII_ROOT . '/app/controllers/MarketplaceController.php';
 require_once KOPII_ROOT . '/app/controllers/AuthController.php';
 require_once KOPII_ROOT . '/app/controllers/DashboardController.php';
+require_once KOPII_ROOT . '/app/controllers/ShopController.php';
+require_once KOPII_ROOT . '/app/controllers/SellerController.php';
+require_once KOPII_ROOT . '/app/controllers/OpportunityController.php';
 require_once KOPII_ROOT . '/app/controllers/AdminController.php';
 
 // Anything uncaught ends here: log the details, show visitors a plain apology. Only a developer's
@@ -146,6 +151,18 @@ $router->get('/provider/{slug}', [MarketplaceController::class, 'showProvider'])
 $router->post('/provider/{slug}/inquire', [MarketplaceController::class, 'submitInquiry']);
 $router->post('/provider/{slug}/review', [MarketplaceController::class, 'submitReview']);
 
+// Shop
+$router->get('/shop', [ShopController::class, 'index']);
+$router->get('/product/{slug}', [ShopController::class, 'show']);
+$router->post('/product/{slug}/inquire', [ShopController::class, 'inquire']);
+
+// Opportunities board ("/opportunities/new" is listed before "/opportunities/{id}" so it is not read as an id)
+$router->get('/opportunities', [OpportunityController::class, 'index']);
+$router->get('/opportunities/new', [OpportunityController::class, 'newForm']);
+$router->post('/opportunities', [OpportunityController::class, 'store']);
+$router->get('/opportunities/{id}', [OpportunityController::class, 'show']);
+$router->post('/opportunities/{id}/respond', [OpportunityController::class, 'respond']);
+
 // Self-Registration & Authentication Routes
 $router->get('/register', [AuthController::class, 'showRegister']);
 $router->post('/register', [AuthController::class, 'register']);
@@ -168,12 +185,25 @@ $router->post('/dashboard/portfolio/delete', [DashboardController::class, 'delet
 $router->post('/dashboard/packages/add', [DashboardController::class, 'addPackage']);
 $router->post('/dashboard/packages/delete', [DashboardController::class, 'deletePackage']);
 $router->post('/dashboard/inquiries/status', [DashboardController::class, 'updateInquiryStatus']);
+$router->post('/dashboard/products/save', [SellerController::class, 'save']);
+$router->post('/dashboard/products/status', [SellerController::class, 'setStatus']);
+$router->post('/dashboard/products/delete', [SellerController::class, 'delete']);
+$router->post('/dashboard/products/image/delete', [SellerController::class, 'deleteImage']);
+$router->get('/dashboard/opportunities', [OpportunityController::class, 'mine']);
+$router->post('/dashboard/opportunities/response', [OpportunityController::class, 'responseStatus']);
+$router->post('/dashboard/opportunities/withdraw', [OpportunityController::class, 'withdraw']);
+$router->get('/dashboard/opportunities/{id}', [OpportunityController::class, 'manage']);
+$router->post('/dashboard/opportunities/{id}/status', [OpportunityController::class, 'setStatus']);
 
 // Platform Admin Routes
 $router->get('/admin', [AdminController::class, 'index']);
 $router->get('/admin/providers', [AdminController::class, 'providers']);
 $router->get('/admin/providers/{id}', [AdminController::class, 'provider']);
 $router->post('/admin/moderate', [AdminController::class, 'moderate']);
+$router->get('/admin/products', [AdminController::class, 'products']);
+$router->post('/admin/products/moderate', [AdminController::class, 'moderateProduct']);
+$router->get('/admin/opportunities', [AdminController::class, 'opportunities']);
+$router->post('/admin/opportunities/moderate', [AdminController::class, 'moderateOpportunity']);
 $router->get('/admin/reviews', [AdminController::class, 'reviews']);
 $router->post('/admin/reviews/moderate', [AdminController::class, 'moderateReview']);
 $router->get('/admin/users', [AdminController::class, 'users']);

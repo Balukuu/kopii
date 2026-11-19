@@ -92,6 +92,21 @@ function text_length(string $text): int
 }
 
 /**
+ * Cut text to at most $max characters (correct for non-ASCII text), adding "…" when it was cut.
+ * Whitespace runs collapse to single spaces, so it is also fit for a one-line summary.
+ */
+function text_excerpt(string $text, int $max): string
+{
+    $text = trim((string) preg_replace('/\s+/u', ' ', $text));
+    if (text_length($text) <= $max) {
+        return $text;
+    }
+    return function_exists('mb_substr')
+        ? rtrim(mb_substr($text, 0, $max - 1, 'UTF-8')) . '…'
+        : rtrim(substr($text, 0, $max - 1)) . '…';
+}
+
+/**
  * True when the visitor reached us over HTTPS, including behind a TLS-terminating
  * proxy or CDN (Cloudflare, cPanel proxy, load balancers) that forwards plain HTTP to PHP.
  */
@@ -207,6 +222,15 @@ function redirect_to(string $path, array $query = []): never
 }
 
 /**
+ * Escape a visitor's search text so % and _ match themselves in a `LIKE ... ESCAPE '!'` pattern.
+ * `!` is the escape character because the syntax for escaping a backslash differs between MySQL and SQLite.
+ */
+function like_escape(string $text): string
+{
+    return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $text);
+}
+
+/**
  * Format Ugandan Shillings (UGX).
  */
 function format_ugx(int|float|string|null $amount): string
@@ -216,6 +240,46 @@ function format_ugx(int|float|string|null $amount): string
         return 'Custom Quote';
     }
     return 'UGX ' . number_format($num, 0, '.', ',');
+}
+
+/** A product's price. 0 means the seller left it open: "Ask for price" (format_ugx() says "Custom Quote", which suits services). */
+function product_price(int|float|string|null $amount): string
+{
+    return (int) ($amount ?? 0) > 0 ? format_ugx($amount) : 'Ask for price';
+}
+
+/** An opportunity's budget as one line: "UGX 500,000 – 900,000", "Up to UGX 2,000,000", or "Budget not stated". */
+function budget_range(int|string|null $min, int|string|null $max): string
+{
+    $min = (int) ($min ?? 0);
+    $max = (int) ($max ?? 0);
+    if ($min > 0 && $max > 0) {
+        return $min === $max
+            ? format_ugx($min)
+            : 'UGX ' . number_format($min, 0, '.', ',') . ' – ' . number_format($max, 0, '.', ',');
+    }
+    if ($max > 0) {
+        return 'Up to ' . format_ugx($max);
+    }
+    if ($min > 0) {
+        return 'From ' . format_ugx($min);
+    }
+    return 'Budget not stated';
+}
+
+/**
+ * Availability of a product as [label, badge class] for the shop cards and pages.
+ *
+ * @return array{0: string, 1: string}
+ */
+function stock_badge(string $status): array
+{
+    return match ($status) {
+        'low_stock'     => ['Low stock', 'badge-warn'],
+        'made_to_order' => ['Made to order', 'badge-type'],
+        'out_of_stock'  => ['Out of stock', 'badge-out'],
+        default         => ['In stock', 'badge-avail'],
+    };
 }
 
 /**

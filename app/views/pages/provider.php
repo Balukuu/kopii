@@ -169,6 +169,21 @@ $authUser  = current_user();
                 </section>
             <?php endif; ?>
 
+            <!-- 2b. Shop products -->
+            <?php if (!empty($products)): ?>
+                <section class="content-panel" aria-labelledby="products-heading">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.75rem; margin-block-end:1.1rem;">
+                        <h2 id="products-heading" class="m-0">Shop (<?= count($products) ?>)</h2>
+                        <a href="<?= e(route_url('/shop')) ?>" class="btn btn-outline btn-sm">Browse the whole shop</a>
+                    </div>
+                    <div class="product-grid">
+                        <?php foreach ($products as $p): ?>
+                            <?php View::partial('product_card', ['p' => $p, 'hideSeller' => true]); ?>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+            <?php endif; ?>
+
             <!-- 3. About & Specialties -->
             <section class="content-panel" aria-labelledby="about-provider-heading">
                 <h2 id="about-provider-heading">About <?= e($provider['business_name']) ?></h2>

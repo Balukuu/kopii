@@ -3,7 +3,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
 
 /**
  * The admin console: an overview of what needs a decision, listings (with the Verified check),
- * reviews, accounts, and the log of everything an administrator has done.
+ * shop products, opportunities, reviews, accounts, and the log of everything an administrator has done.
  *
  * Every action sets an explicit state (never "flip whatever it is now"), is recorded in the
  * audit log, and returns to the page it was started from.
@@ -169,6 +169,157 @@ class AdminController
         }
 
         admin_redirect_back('/admin/providers/' . $id);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Shop products
+    // ---------------------------------------------------------------------------------------
+
+    public function products(): void
+    {
+        require_admin();
+
+        $filters = [
+            'q'        => $this->text('q'),
+            'status'   => $this->choice('status', ProductModel::STATUSES),
+            'category' => $this->text('category'),
+        ];
+
+        [$page, $pages, $total] = $this->paginate(ProductModel::adminCount($filters));
+
+        View::render('admin/products', [
+            'pageTitle'    => 'Products — Admin — Kopii',
+            'currentRoute' => '/admin/products',
+            'adminTab'     => 'products',
+            'products'     => ProductModel::adminSearch($filters, self::PER_PAGE, ($page - 1) * self::PER_PAGE),
+            'categories'   => ProductModel::categories(),
+            'filters'      => $filters,
+            'page'         => $page,
+            'pages'        => $pages,
+            'total'        => $total,
+        ]);
+    }
+
+    /** Hide a product from the shop (suspend) or show it again (reinstate). */
+    public function moderateProduct(): void
+    {
+        require_admin();
+        verify_csrf();
+
+        $id      = (int) ($_POST['product_id'] ?? 0);
+        $action  = (string) ($_POST['mod_action'] ?? '');
+        $product = $id > 0 ? ProductModel::adminFind($id) : null;
+
+        if ($product === null) {
+            flash('error', 'That product no longer exists.');
+            admin_redirect_back('/admin/products');
+        }
+
+        $note   = $this->note('/admin/products');
+        $label  = (string) $product['name'] . ' (' . (string) $product['business_name'] . ')';
+        $status = (string) $product['status'];
+
+        if ($action === 'suspend') {
+            if ($status === ProductModel::SUSPENDED) {
+                flash('success', 'That product is already hidden.');
+            } elseif (text_length($note) < 5) {
+                // The seller is emailed this reason, so it has to say something.
+                flash('error', 'Write a short reason (at least 5 characters). The seller receives it by email.');
+            } else {
+                ProductModel::adminSetStatus($id, ProductModel::SUSPENDED);
+                AdminLogModel::record('product.suspend', 'product', $id, $label, $note);
+                Notifier::contentModerated((string) $product['owner_email'], (string) $product['owner_name'], 'product', (string) $product['name'], true, $note);
+                flash('success', '"' . $product['name'] . '" is hidden from the shop. The seller has been emailed.');
+            }
+        } elseif ($action === 'reinstate') {
+            if ($status !== ProductModel::SUSPENDED) {
+                flash('success', 'That product is not suspended.');
+            } else {
+                ProductModel::adminSetStatus($id, ProductModel::ACTIVE);
+                AdminLogModel::record('product.reinstate', 'product', $id, $label, $note);
+                Notifier::contentModerated((string) $product['owner_email'], (string) $product['owner_name'], 'product', (string) $product['name'], false);
+                flash('success', '"' . $product['name'] . '" is back in the shop. The seller has been emailed.');
+            }
+        } else {
+            flash('error', 'That action is not recognised.');
+        }
+
+        admin_redirect_back('/admin/products');
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Opportunities
+    // ---------------------------------------------------------------------------------------
+
+    public function opportunities(): void
+    {
+        require_admin();
+
+        $filters = [
+            'q'      => $this->text('q'),
+            'status' => $this->choice('status', OpportunityModel::STATUSES),
+            'kind'   => $this->choice('kind', OpportunityModel::KINDS),
+        ];
+
+        [$page, $pages, $total] = $this->paginate(OpportunityModel::adminCount($filters));
+        $uganda = require KOPII_ROOT . '/app/config/uganda.php';
+
+        View::render('admin/opportunities', [
+            'pageTitle'     => 'Opportunities — Admin — Kopii',
+            'currentRoute'  => '/admin/opportunities',
+            'adminTab'      => 'opportunities',
+            'opportunities' => OpportunityModel::adminSearch($filters, self::PER_PAGE, ($page - 1) * self::PER_PAGE),
+            'kinds'         => $uganda['opportunity_kinds'],
+            'filters'       => $filters,
+            'page'          => $page,
+            'pages'         => $pages,
+            'total'         => $total,
+        ]);
+    }
+
+    public function moderateOpportunity(): void
+    {
+        require_admin();
+        verify_csrf();
+
+        $id  = (int) ($_POST['opportunity_id'] ?? 0);
+        $opp = $id > 0 ? OpportunityModel::find($id) : null;
+
+        if ($opp === null) {
+            flash('error', 'That opportunity no longer exists.');
+            admin_redirect_back('/admin/opportunities');
+        }
+
+        $action = (string) ($_POST['mod_action'] ?? '');
+        $note   = $this->note('/admin/opportunities');
+        $label  = (string) $opp['title'];
+
+        if ($action === 'suspend') {
+            if ($opp['status'] === OpportunityModel::SUSPENDED) {
+                flash('success', 'That opportunity is already hidden.');
+            } elseif (text_length($note) < 5) {
+                flash('error', 'Write a short reason (at least 5 characters). The person who posted it receives it by email.');
+            } else {
+                OpportunityModel::adminSetStatus($id, OpportunityModel::SUSPENDED);
+                AdminLogModel::record('opportunity.suspend', 'opportunity', $id, $label, $note);
+                Notifier::contentModerated((string) $opp['poster_email'], (string) $opp['poster_name'], 'opportunity', $label, true, $note);
+                flash('success', 'The opportunity is hidden. The person who posted it has been emailed.');
+            }
+        } elseif ($action === 'reinstate') {
+            if ($opp['status'] !== OpportunityModel::SUSPENDED) {
+                flash('success', 'That opportunity is not suspended.');
+            } else {
+                // Back as 'open'; if its closing date has passed it simply shows as closed until the poster extends it.
+                OpportunityModel::adminSetStatus($id, OpportunityModel::OPEN);
+                AdminLogModel::record('opportunity.reinstate', 'opportunity', $id, $label, $note);
+                Notifier::contentModerated((string) $opp['poster_email'], (string) $opp['poster_name'], 'opportunity', $label, false);
+                flash('success', 'The opportunity is visible again. The person who posted it has been emailed.');
+            }
+        } else {
+            flash('error', 'That action is not recognised.');
+        }
+
+        admin_redirect_back('/admin/opportunities');
     }
 
     // ---------------------------------------------------------------------------------------

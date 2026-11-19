@@ -8,10 +8,10 @@ class InquiryModel
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'INSERT INTO inquiries (
-                provider_id, client_user_id, package_id, client_name, client_email, client_phone,
+                provider_id, client_user_id, package_id, product_id, product_name, client_name, client_email, client_phone,
                 event_date, event_location, budget_ugx, project_details, status, created_at
             ) VALUES (
-                :pid, :cuid, :pkgid, :cname, :cemail, :cphone,
+                :pid, :cuid, :pkgid, :prodid, :prodname, :cname, :cemail, :cphone,
                 :edate, :eloc, :budget, :details, :status, :created
             )'
         );
@@ -22,6 +22,8 @@ class InquiryModel
             ':pid'     => (int) $data['provider_id'],
             ':cuid'    => !empty($data['client_user_id']) ? (int) $data['client_user_id'] : null,
             ':pkgid'   => $pkgId,
+            ':prodid'  => !empty($data['product_id']) ? (int) $data['product_id'] : null,
+            ':prodname' => !empty($data['product_name']) ? substr(trim((string) $data['product_name']), 0, 160) : null,
             ':cname'   => trim((string) $data['client_name']),
             ':cemail'  => strtolower(trim((string) $data['client_email'])),
             ':cphone'  => trim((string) $data['client_phone']),
@@ -91,10 +93,12 @@ class InquiryModel
         }
 
         $sql = "
-            SELECT i.*, p.business_name, p.slug AS provider_slug, p.whatsapp AS provider_whatsapp, sp.name AS package_name
+            SELECT i.*, p.business_name, p.slug AS provider_slug, p.whatsapp AS provider_whatsapp, sp.name AS package_name,
+                   pd.slug AS product_slug
             FROM inquiries i
             INNER JOIN providers p ON p.id = i.provider_id
             LEFT JOIN service_packages sp ON sp.id = i.package_id
+            LEFT JOIN products pd ON pd.id = i.product_id
             WHERE ({$where})
             ORDER BY i.id DESC
         ";

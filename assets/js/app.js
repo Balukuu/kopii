@@ -592,6 +592,29 @@
         btn.closest('dialog')?.close();
       });
     });
+
+    // A form that failed validation on the server comes back with its dialog open and filled in.
+    document.querySelectorAll('dialog[data-autoopen]').forEach((dialog) => {
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+    });
+  };
+
+  // Product photos: a thumbnail swaps the large photo. Without JavaScript the large photo stays
+  // the first one and the thumbnails are simply not interactive.
+  const initProductGallery = () => {
+    document.querySelectorAll('[data-gallery]').forEach((gallery) => {
+      const main = gallery.querySelector('[data-gallery-main]');
+      const thumbs = gallery.querySelectorAll('[data-gallery-thumb]');
+      if (!main || thumbs.length === 0) return;
+
+      thumbs.forEach((thumb) => {
+        thumb.addEventListener('click', () => {
+          main.setAttribute('src', thumb.getAttribute('data-src') || '');
+          thumbs.forEach((other) => other.removeAttribute('aria-current'));
+          thumb.setAttribute('aria-current', 'true');
+        });
+      });
+    });
   };
 
   // 7. Portfolio Showcase Lightbox Viewer (<dialog closedby="any">)
@@ -956,6 +979,7 @@
   initVerticalTabs();
   initHireWizard();
   initDialogs();
+  initProductGallery();
   initPortfolioLightbox();
   initAuthEnhancements();
   initShortlist();

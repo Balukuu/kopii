@@ -44,6 +44,9 @@ class MarketplaceController
             'verticalTabs'      => $verticalTabs,
             'showcaseWork'      => $showcaseWork,
             'stats'             => $stats,
+            'latestProducts'      => ProductModel::latest(4),
+            'latestOpportunities' => OpportunityModel::latest(3),
+            'opportunityKinds'    => $uganda['opportunity_kinds'],
         ]);
     }
 
@@ -79,11 +82,11 @@ class MarketplaceController
     }
 
     /**
-     * Validate and tidy the contact fields shared by the quote form and the hire brief.
+     * Validate and tidy the contact fields shared by the quote form, the hire brief and the product enquiry.
      *
      * @return array{0: array, 1: list<string>} the cleaned values and a list of problems
      */
-    private static function cleanLead(array $post): array
+    public static function cleanLead(array $post): array
     {
         $clean = [
             'name'       => trim((string) ($post['client_name'] ?? '')),
@@ -276,6 +279,7 @@ class MarketplaceController
             'currentRoute'    => '/provider',
             'provider'        => $provider,
             'related'         => array_slice($related, 0, 3),
+            'products'        => $provider['status'] === 'active' ? ProductModel::forProvider((int) $provider['id'], true) : [],
         ]);
     }
 

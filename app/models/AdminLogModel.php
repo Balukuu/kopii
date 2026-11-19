@@ -9,7 +9,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
  */
 final class AdminLogModel
 {
-    public const TYPES = ['provider', 'review', 'user'];
+    public const TYPES = ['provider', 'product', 'opportunity', 'review', 'user'];
 
     public static function record(string $action, string $targetType, ?int $targetId, string $label, string $note = ''): void
     {
@@ -33,7 +33,7 @@ final class AdminLogModel
     }
 
     /**
-     * @param string   $targetType '' for everything, otherwise provider | review | user
+     * @param string   $targetType '' for everything, otherwise provider | product | opportunity | review | user
      * @param int|null $targetId   only entries about this one target
      */
     public static function recent(int $limit = 20, int $offset = 0, string $targetType = '', ?int $targetId = null): array
@@ -70,6 +70,10 @@ final class AdminLogModel
             'provider.unfeature' => 'Removed ' . $label . ' from Featured',
             'provider.pause'     => 'Paused ' . $label,
             'provider.activate'  => 'Reactivated ' . $label,
+            'product.suspend'    => 'Hid the product ' . $label,
+            'product.reinstate'  => 'Restored the product ' . $label,
+            'opportunity.suspend'   => 'Hid the opportunity "' . $label . '"',
+            'opportunity.reinstate' => 'Restored the opportunity "' . $label . '"',
             'review.approve'     => 'Approved: ' . $label,
             'review.delete'      => 'Deleted: ' . $label,
             'user.suspend'       => 'Suspended ' . $label,

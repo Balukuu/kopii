@@ -82,7 +82,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 if ($schemaSql === false) {
                     throw new RuntimeException('Could not read database/schema.mysql.sql.');
                 }
-                $pdo->exec($schemaSql);
+                // One statement per call: PDO's MySQL driver only reports a failure in the first statement of a
+                // multi-statement string, so a table that failed to create would otherwise be reported as success.
+                require_once KOPII_ROOT . '/app/core/Migrator.php';
+                foreach (Migrator::splitStatements($schemaSql) as $statement) {
+                    $pdo->exec($statement);
+                }
 
                 // Sample providers get a random password nobody knows, so a live site never has
                 // demo accounts with a published password.

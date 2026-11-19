@@ -457,6 +457,51 @@ $worldDots = [
     </div>
 </section>
 
+<?php if (!empty($latestProducts)): ?>
+<section class="section-pad surface-white">
+    <div class="container">
+        <div class="section-head">
+            <div>
+                <h2>Shop from Ugandan businesses</h2>
+                <p>New products with prices in UGX. Message the seller to ask questions and arrange delivery.</p>
+            </div>
+            <a href="<?= e(route_url('/shop')) ?>" class="btn btn-outline">Browse the shop <?= svg_icon('arrow-right', 16) ?></a>
+        </div>
+        <div class="product-grid">
+            <?php foreach ($latestProducts as $p): ?>
+                <?php View::partial('product_card', ['p' => $p]); ?>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
+
+<?php if (!empty($latestOpportunities)): ?>
+<section class="section-pad surface-grey">
+    <div class="container">
+        <div class="section-head">
+            <div>
+                <h2>Open opportunities</h2>
+                <p>Projects, jobs, tenders and supply requests. Send a proposal with your price and timeline.</p>
+            </div>
+            <a href="<?= e(route_url('/opportunities')) ?>" class="btn btn-outline">See all opportunities <?= svg_icon('arrow-right', 16) ?></a>
+        </div>
+        <div class="opp-list">
+            <?php foreach ($latestOpportunities as $o): ?>
+                <?php View::partial('opportunity_card', ['o' => $o, 'kinds' => $opportunityKinds]); ?>
+            <?php endforeach; ?>
+        </div>
+        <div class="board-cta" style="margin-block-start:var(--space-5);">
+            <div>
+                <h3>Need something done?</h3>
+                <p>Post what you need and let providers come to you.</p>
+            </div>
+            <a href="<?= e(route_url('/opportunities/new')) ?>" class="btn btn-primary">Post an opportunity</a>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
+
 <?php if (!empty($showcaseWork)): ?>
 <section class="section-pad surface-white">
     <div class="container">
