@@ -68,7 +68,7 @@ $waGreeting = 'Hi ' . $p['business_name'] . '! I reviewed your dossier on Kopii 
             <?php endif; ?>
 
             <div class="card-meta-line">
-                <span><?= svg_icon('map-pin', 16) ?> <?= e($p['city']) ?></span>
+                <span><?= svg_icon('map-pin', 16) ?> <?= e($p['city']) ?><?= !empty($p['neighborhood']) ? ', ' . e($p['neighborhood']) : '' ?></span>
                 <?php if (!empty($p['years_experience'])): ?>
                     <span><?= (int) $p['years_experience'] ?>+ yrs exp</span>
                 <?php endif; ?>

@@ -9,6 +9,38 @@ class Seeder
      *                              The web installer passes a random one so a live site never has
      *                              demo accounts with a known password.
      */
+    /** [name, slug, icon, description, sort order]: services people hire close to home, added in schema version 5. */
+    public const EXTRA_SERVICE_CATEGORIES = [
+        ['Home Repairs & Maintenance', 'home-repairs', 'wrench', 'Plumbers, carpenters, painters, welders, roofers, and fundis for everyday fixes at home or the office.', 11],
+        ['Solar & Electrical', 'solar-electrical', 'sun', 'Solar panel and battery installation, house wiring, security lighting, CCTV, and electrical repairs.', 12],
+        ['Cleaning & Home Services', 'cleaning-home-services', 'sparkles', 'House and office cleaning, laundry, fumigation, gardening and compound care, and domestic help.', 13],
+        ['Agricultural Services', 'agricultural-services', 'leaf', 'Farm advice, veterinary and animal-health services, irrigation setup, farm labour, and produce transport.', 14],
+    ];
+
+    /**
+     * Add the categories above to an existing database. Safe to run more than once: it only adds a
+     * category whose slug is not there yet, and it leaves everything an administrator edited alone.
+     */
+    public static function seedExtraServiceCategories(PDO $pdo): void
+    {
+        $exists = $pdo->prepare('SELECT COUNT(*) FROM categories WHERE slug = :slug');
+        $insert = $pdo->prepare('INSERT INTO categories (name, slug, icon, description, sort_order) VALUES (:name, :slug, :icon, :desc, :sort)');
+        foreach (self::EXTRA_SERVICE_CATEGORIES as [$name, $slug, $icon, $desc, $sort]) {
+            $exists->execute([':slug' => $slug]);
+            if ((int) $exists->fetchColumn() === 0) {
+                $insert->execute([':name' => $name, ':slug' => $slug, ':icon' => $icon, ':desc' => $desc, ':sort' => $sort]);
+            }
+        }
+
+        // "Construction & Architecture" used to list solar, plumbing and electrical work: those have their own
+        // categories now. Only reworded when nobody has changed the original text.
+        $pdo->prepare('UPDATE categories SET description = :new WHERE slug = :slug AND description = :old')->execute([
+            ':new'  => 'Architectural plans, civil engineers, builders, contractors, and building-materials suppliers.',
+            ':slug' => 'construction-architecture',
+            ':old'  => 'Architectural plans, civil builders, solar installation, plumbing, and electrical.',
+        ]);
+    }
+
     public static function run(PDO $pdo, bool $includeDemoListings = true, array $adminOverride = [], ?string $demoPassword = null): void
     {
         $stmt = $pdo->query('SELECT COUNT(*) FROM categories');
@@ -31,6 +63,10 @@ class Seeder
             ['Construction & Architecture', 'construction-architecture', 'layers', 'Architectural plans, civil builders, solar installation, plumbing, and electrical.', 9],
             ['Transport & Logistics', 'transport-logistics', 'truck', 'Bridal car hire, safari & executive vans, courier delivery, and home moving.', 10],
         ];
+        // Everyday home and farm services, the work people most often need done near them.
+        foreach (self::EXTRA_SERVICE_CATEGORIES as $extra) {
+            $categories[] = $extra;
+        }
 
         $catStmt = $pdo->prepare(
             'INSERT INTO categories (name, slug, icon, description, sort_order) VALUES (:name, :slug, :icon, :desc, :sort)'

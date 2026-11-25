@@ -90,6 +90,7 @@ require_once KOPII_ROOT . '/app/core/View.php';
 require_once KOPII_ROOT . '/app/core/ImageProcessor.php';
 require_once KOPII_ROOT . '/app/core/Mailer.php';
 require_once KOPII_ROOT . '/app/core/Notifier.php';
+require_once KOPII_ROOT . '/app/core/SiteHealth.php';
 
 require_once KOPII_ROOT . '/app/models/CategoryModel.php';
 require_once KOPII_ROOT . '/app/models/UserModel.php';
@@ -98,6 +99,7 @@ require_once KOPII_ROOT . '/app/models/ProviderModel.php';
 require_once KOPII_ROOT . '/app/models/InquiryModel.php';
 require_once KOPII_ROOT . '/app/models/ProductModel.php';
 require_once KOPII_ROOT . '/app/models/OpportunityModel.php';
+require_once KOPII_ROOT . '/app/models/SupportModel.php';
 require_once KOPII_ROOT . '/app/models/PasswordResetModel.php';
 require_once KOPII_ROOT . '/app/models/EmailVerificationModel.php';
 require_once KOPII_ROOT . '/app/models/AdminLogModel.php';
@@ -109,6 +111,8 @@ require_once KOPII_ROOT . '/app/controllers/DashboardController.php';
 require_once KOPII_ROOT . '/app/controllers/ShopController.php';
 require_once KOPII_ROOT . '/app/controllers/SellerController.php';
 require_once KOPII_ROOT . '/app/controllers/OpportunityController.php';
+require_once KOPII_ROOT . '/app/controllers/PageController.php';
+require_once KOPII_ROOT . '/app/controllers/AccountController.php';
 require_once KOPII_ROOT . '/app/controllers/AdminController.php';
 
 // Anything uncaught ends here: log the details, show visitors a plain apology. Only a developer's
@@ -152,6 +156,16 @@ $router->get('/provider/{slug}', [MarketplaceController::class, 'showProvider'])
 $router->post('/provider/{slug}/inquire', [MarketplaceController::class, 'submitInquiry']);
 $router->post('/provider/{slug}/review', [MarketplaceController::class, 'submitReview']);
 
+// Terms, privacy, contact, "report this listing", and the files search engines ask for
+$router->get('/terms', [PageController::class, 'terms']);
+$router->get('/privacy', [PageController::class, 'privacy']);
+$router->get('/safety', [PageController::class, 'safety']);
+$router->get('/contact', [PageController::class, 'contact']);
+$router->post('/contact', [PageController::class, 'contactSend']);
+$router->post('/report', [PageController::class, 'report']);
+$router->get('/robots.txt', [PageController::class, 'robots']);
+$router->get('/sitemap.xml', [PageController::class, 'sitemap']);
+
 // Shop
 $router->get('/shop', [ShopController::class, 'index']);
 $router->get('/product/{slug}', [ShopController::class, 'show']);
@@ -182,8 +196,10 @@ $router->get('/dashboard', [DashboardController::class, 'index']);
 $router->post('/dashboard/become-provider', [DashboardController::class, 'becomeProvider']);
 $router->post('/dashboard/profile', [DashboardController::class, 'updateProfile']);
 $router->post('/dashboard/portfolio/add', [DashboardController::class, 'addPortfolio']);
+$router->post('/dashboard/portfolio/update', [DashboardController::class, 'updatePortfolio']);
 $router->post('/dashboard/portfolio/delete', [DashboardController::class, 'deletePortfolio']);
 $router->post('/dashboard/packages/add', [DashboardController::class, 'addPackage']);
+$router->post('/dashboard/packages/update', [DashboardController::class, 'updatePackage']);
 $router->post('/dashboard/packages/delete', [DashboardController::class, 'deletePackage']);
 $router->post('/dashboard/inquiries/status', [DashboardController::class, 'updateInquiryStatus']);
 $router->post('/dashboard/products/save', [SellerController::class, 'save']);
@@ -195,6 +211,13 @@ $router->post('/dashboard/opportunities/response', [OpportunityController::class
 $router->post('/dashboard/opportunities/withdraw', [OpportunityController::class, 'withdraw']);
 $router->get('/dashboard/opportunities/{id}', [OpportunityController::class, 'manage']);
 $router->post('/dashboard/opportunities/{id}/status', [OpportunityController::class, 'setStatus']);
+
+// Account settings (any signed-in person)
+$router->get('/account', [AccountController::class, 'index']);
+$router->post('/account/details', [AccountController::class, 'updateDetails']);
+$router->post('/account/email', [AccountController::class, 'updateEmail']);
+$router->post('/account/password', [AccountController::class, 'updatePassword']);
+$router->post('/account/delete', [AccountController::class, 'delete']);
 
 // Platform Admin Routes
 $router->get('/admin', [AdminController::class, 'index']);
@@ -209,6 +232,12 @@ $router->get('/admin/reviews', [AdminController::class, 'reviews']);
 $router->post('/admin/reviews/moderate', [AdminController::class, 'moderateReview']);
 $router->get('/admin/users', [AdminController::class, 'users']);
 $router->post('/admin/users/action', [AdminController::class, 'userAction']);
+$router->get('/admin/categories', [AdminController::class, 'categories']);
+$router->post('/admin/categories/save', [AdminController::class, 'saveCategory']);
+$router->post('/admin/categories/delete', [AdminController::class, 'deleteCategory']);
+$router->get('/admin/inbox', [AdminController::class, 'inbox']);
+$router->post('/admin/inbox/action', [AdminController::class, 'inboxAction']);
+$router->post('/admin/health/test-email', [AdminController::class, 'testEmail']);
 $router->get('/admin/activity', [AdminController::class, 'activity']);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');

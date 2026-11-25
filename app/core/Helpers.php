@@ -131,7 +131,7 @@ function request_is_https(): bool
  *
  * The CSP is what limits the damage of an injection bug: scripts may only come from this site, so
  * injected markup cannot run code or load code from elsewhere. Styles still allow inline `style=""`
- * attributes (the views use them) plus the two font providers the layout loads.
+ * attributes (the views use them) plus Google Fonts, the one third-party host the layout loads (the page font, Plus Jakarta Sans).
  *
  * Optional env.php switches:
  *   'csp'           => true (default, enforce) | 'report-only' (log violations in the browser console
@@ -151,9 +151,9 @@ function send_security_headers(): void
         $directives = [
             "default-src 'self'",
             "script-src 'self'",
-            "style-src 'self' 'unsafe-inline' https://use.typekit.net https://p.typekit.net https://fonts.googleapis.com",
-            "font-src 'self' https://use.typekit.net https://fonts.gstatic.com",
-            "img-src 'self' data: https://p.typekit.net",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' https://fonts.gstatic.com",
+            "img-src 'self' data:",
             "connect-src 'self'",
             "object-src 'none'",
             "base-uri 'self'",
@@ -238,6 +238,61 @@ function site_origin(): string
 function absolute_url(string $path = '/', array $query = []): string
 {
     return site_origin() . route_url($path, $query);
+}
+
+/**
+ * The path of this request without the site's folder (when installed in a subfolder) and without the
+ * query string, e.g. "/provider/pearl-lens-studios". "/" for the home page.
+ */
+function request_path(): string
+{
+    $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?? '/');
+    $base = base_path();
+    if ($base !== '' && str_starts_with($path, $base)) {
+        $path = substr($path, strlen($base));
+    }
+    $path = '/' . ltrim($path, '/');
+    if ($path === '/index.php') {
+        return '/';
+    }
+    return $path === '/' ? '/' : rtrim($path, '/');
+}
+
+/**
+ * The address search engines and link previews should treat as THE address of this page: the request's
+ * path on the configured site URL, without tracking or filter parameters. Built on site_origin(), so a
+ * forged Host header cannot change it.
+ */
+function canonical_url(): string
+{
+    return absolute_url(request_path());
+}
+
+/**
+ * Pages that must stay out of search results: signed-in areas, the admin console, and the forms
+ * that only make sense with a private link or a session.
+ */
+function request_is_private_area(): bool
+{
+    $path = request_path();
+    foreach (['/admin', '/dashboard', '/account', '/login', '/forgot-password', '/reset-password', '/verify-email', '/hire/brief'] as $prefix) {
+        if ($path === $prefix || str_starts_with($path, $prefix . '/')) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * A site file's URL with its last-changed time on the end (assets/css/app.css?v=1732450000). The server
+ * tells browsers to keep CSS and JavaScript for a week; without this a returning visitor would keep the
+ * old styles after an update. The address changes only when the file does, so caching still works.
+ */
+function versioned_asset_url(string $path): string
+{
+    $file = KOPII_ROOT . '/' . ltrim($path, '/');
+    $time = is_file($file) ? (int) filemtime($file) : 0;
+    return asset_url($path) . ($time > 0 ? '?v=' . $time : '');
 }
 
 /**
@@ -639,20 +694,22 @@ function admin_attention_counts(): array
             $counts = AdminModel::attentionCounts();
         } catch (Throwable $e) {
             report_exception($e);
-            $counts = ['pending_reviews' => 0, 'unverified_providers' => 0, 'unconfirmed_emails' => 0];
+            $counts = ['pending_reviews' => 0, 'unverified_providers' => 0, 'unconfirmed_emails' => 0, 'open_messages' => 0];
         }
     }
     return $counts;
 }
 
 /**
- * The number on the nav badge: reviews waiting for approval. Listings without the Verified badge are
- * deliberately not counted: anyone can list for free, so most listings start unverified and the
- * badge would never clear. They are shown on the admin overview instead.
+ * The number on the nav badge: reviews waiting for approval plus messages and reports nobody has dealt
+ * with yet. Listings without the Verified badge are deliberately not counted: anyone can list for free,
+ * so most listings start unverified and the badge would never clear. They are shown on the admin
+ * overview instead.
  */
 function admin_attention_total(): int
 {
-    return (int) admin_attention_counts()['pending_reviews'];
+    $counts = admin_attention_counts();
+    return (int) $counts['pending_reviews'] + (int) ($counts['open_messages'] ?? 0);
 }
 
 /**
@@ -755,6 +812,21 @@ function thumb_url(?string $path): string
 }
 
 /**
+ * The photo to show when a page is shared (WhatsApp, Facebook, X): the small thumbnail when there is one,
+ * because a 1,920 px cover makes a link preview slow to appear. Returns a path relative to the site,
+ * or null when the page has no photo of its own (the layout then uses the Kopii logo).
+ */
+function share_image_path(?string $path): ?string
+{
+    $path = (string) $path;
+    if ($path === '' || !str_starts_with($path, 'uploads/') || str_contains($path, '..')) {
+        return null;
+    }
+    $thumb = thumb_path($path);
+    return is_file(KOPII_ROOT . '/' . $thumb) ? $thumb : $path;
+}
+
+/**
  * Delete an uploaded photo and its thumbnail. Only ever touches files inside /uploads,
  * and never the bundled uploads/seed demo images.
  */
@@ -776,6 +848,38 @@ function delete_upload(?string $path): void
             @unlink($real);
         }
     }
+}
+
+/**
+ * "Wakiso, Mukono ; Entebbe Rd" becomes "Wakiso, Mukono, Entebbe Rd": the places a provider says they
+ * serve, split on commas, semicolons and new lines, tidied and de-duplicated. Null when there are too
+ * many places (12) or one is too long (40 characters), so the caller can ask for a shorter list.
+ */
+function normalize_area_list(string $raw): ?string
+{
+    $seen = [];
+    $out  = [];
+    foreach (preg_split('/[,;\n]+/u', $raw) ?: [] as $part) {
+        $part = trim((string) preg_replace('/\s+/u', ' ', $part));
+        if ($part === '') {
+            continue;
+        }
+        if (text_length($part) > 40) {
+            return null;
+        }
+        $key = function_exists('mb_strtolower') ? mb_strtolower($part, 'UTF-8') : strtolower($part);
+        if (!isset($seen[$key])) {
+            $seen[$key] = true;
+            $out[]      = $part;
+        }
+    }
+    return count($out) > 12 ? null : implode(', ', $out);
+}
+
+/** The places a provider serves (the stored comma-separated text) as a list. */
+function area_list(?string $stored): array
+{
+    return array_values(array_filter(array_map('trim', explode(',', (string) $stored)), static fn(string $v): bool => $v !== ''));
 }
 
 /**
@@ -862,7 +966,8 @@ function svg_icon(string $name, int $size = 20, string $class = ''): string
         'verified'    => '<path d="M12 2l2.4 2.1 3.1-.4.7 3.1 2.8 1.5-1.3 2.9 1.3 2.9-2.8 1.5-.7 3.1-3.1-.4L12 22l-2.4-2.1-3.1.4-.7-3.1-2.8-1.5 1.3-2.9-1.3-2.9 2.8-1.5.7-3.1 3.1.4Z"/><path d="m9 12 2 2 4-4"/>',
         'star'        => '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="currentColor"/>',
         'star-outline'=> '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
-        'whatsapp'    => '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+        // The real WhatsApp logo (bubble + handset): a solid glyph, so it ignores the line-icon stroke.
+        'whatsapp'    => '<path fill="currentColor" stroke="none" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>',
         'phone'       => '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
         'mail'        => '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
         'globe'       => '<circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
@@ -880,6 +985,11 @@ function svg_icon(string $name, int $size = 20, string $class = ''): string
         'eye-off'     => '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>',
         'trash'       => '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
         'shield'      => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+        'wrench'      => '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+        'sun'         => '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+        'leaf'        => '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+        'pause'       => '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
+        'play'        => '<polygon points="7 4 20 12 7 20 7 4"/>',
         'chevron-left'=> '<polyline points="15 18 9 12 15 6"/>',
         'chevron-right'=> '<polyline points="9 18 15 12 9 6"/>',
         default       => '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',

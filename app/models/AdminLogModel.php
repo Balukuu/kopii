@@ -9,7 +9,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
  */
 final class AdminLogModel
 {
-    public const TYPES = ['provider', 'product', 'opportunity', 'review', 'user'];
+    public const TYPES = ['provider', 'product', 'opportunity', 'review', 'user', 'category', 'message'];
 
     public static function record(string $action, string $targetType, ?int $targetId, string $label, string $note = ''): void
     {
@@ -33,7 +33,7 @@ final class AdminLogModel
     }
 
     /**
-     * @param string   $targetType '' for everything, otherwise provider | product | opportunity | review | user
+     * @param string   $targetType '' for everything, otherwise provider | product | opportunity | review | user | category | message
      * @param int|null $targetId   only entries about this one target
      */
     public static function recent(int $limit = 20, int $offset = 0, string $targetType = '', ?int $targetId = null): array
@@ -79,6 +79,11 @@ final class AdminLogModel
             'user.suspend'       => 'Suspended ' . $label,
             'user.reinstate'     => 'Reinstated ' . $label,
             'user.resend_verification' => 'Sent a new confirmation email to ' . $label,
+            'category.create'    => 'Added the category "' . $label . '"',
+            'category.update'    => 'Edited the category "' . $label . '"',
+            'category.delete'    => 'Deleted the category "' . $label . '"',
+            'message.handle'     => 'Marked as dealt with: ' . $label,
+            'message.reopen'     => 'Reopened: ' . $label,
             default              => trim((string) ($row['action'] ?? 'Action') . ' ' . $label),
         };
     }

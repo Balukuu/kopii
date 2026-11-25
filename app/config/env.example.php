@@ -28,8 +28,10 @@ return [
     'csp'          => true,
     'hsts_max_age' => 15552000,
 
-    // Address shown to providers in emails about a paused listing or suspended account, so they can
-    // reply to the team. Leave '' to say "get in touch with the Kopii team" without an address.
+    // The team's address. It is shown on the Contact page and in the Terms and Privacy Policy, named in
+    // emails about a paused listing or suspended account, and it is where contact messages and "report
+    // this listing" reports are emailed. Leave '' to email every administrator instead (messages are
+    // always kept in Admin > Inbox either way).
     'support_email' => '',
 
     // Outbound email (lead alerts to providers, password resets).

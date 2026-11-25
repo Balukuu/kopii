@@ -3,6 +3,14 @@ defined('KOPII_APP') or exit('Direct access denied.');
 $authUser = current_user();
 $flashes  = get_flashes();
 $curRoute = $currentRoute ?? '/';
+
+// Page title, description and picture, as shown in search results and in WhatsApp / Facebook previews.
+$seoTitle       = (string) ($pageTitle ?? 'Kopii — Hire Talent & Studios in Uganda');
+$seoDescription = (string) ($metaDescription ?? 'Find a real, verified provider in Uganda for the work you need, from home repairs and solar to events, design and photography. See their past work and UGX prices, then talk on WhatsApp. Free, with no commission.');
+$seoImagePath   = (string) ($ogImage ?? 'assets/images/og-default.jpg');
+$seoImage       = site_origin() . asset_url($seoImagePath);
+$seoCanonical   = (string) ($canonicalUrl ?? canonical_url());
+$seoNoindex     = !empty($noindex) || request_is_private_area();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -10,14 +18,27 @@ $curRoute = $currentRoute ?? '/';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($pageTitle ?? 'Kopii — Hire Talent & Studios in Uganda') ?></title>
-    <meta name="description" content="<?= e($metaDescription ?? 'Kopii is a free showcase marketplace for Ugandan photographers, brand designers, bespoke tailors, event caterers, and studios. Compare upfront UGX packages and hire directly.') ?>">
+    <meta name="description" content="<?= e($seoDescription) ?>">
+    <link rel="canonical" href="<?= e($seoCanonical) ?>">
+<?php if ($seoNoindex): ?>
+    <meta name="robots" content="noindex, nofollow">
+<?php endif; ?>
+    <meta property="og:site_name" content="Kopii">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="en_UG">
+    <meta property="og:title" content="<?= e($seoTitle) ?>">
+    <meta property="og:description" content="<?= e($seoDescription) ?>">
+    <meta property="og:url" content="<?= e($seoCanonical) ?>">
+    <meta property="og:image" content="<?= e($seoImage) ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= e($seoTitle) ?>">
+    <meta name="twitter:description" content="<?= e($seoDescription) ?>">
+    <meta name="twitter:image" content="<?= e($seoImage) ?>">
     <link rel="icon" href="<?= e(asset_url('assets/images/favicon.png')) ?>" type="image/png">
-    <link rel="preconnect" href="https://use.typekit.net" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://use.typekit.net/rlr4crj.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap">
-    <link rel="stylesheet" href="<?= e(asset_url('assets/css/app.css')) ?>">
+    <link rel="stylesheet" href="<?= e(versioned_asset_url('assets/css/app.css')) ?>">
 </head>
 <body class="<?= $curRoute === '/' ? 'is-home' : '' ?>">
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -45,7 +66,7 @@ $curRoute = $currentRoute ?? '/';
                         <a class="nav-link" href="<?= e(route_url('/explore')) ?>"<?= ($curRoute === '/explore' && ($_GET['tab'] ?? '') !== 'work' && ($_GET['type'] ?? '') !== 'business') ? ' aria-current="page"' : '' ?>>Hire Talent</a>
                     </li>
                     <li>
-                        <a class="nav-link" href="<?= e(route_url('/explore', ['type' => 'business'])) ?>"<?= ($curRoute === '/explore' && ($_GET['type'] ?? '') === 'business') ? ' aria-current="page"' : '' ?>>Studios &amp; Services</a>
+                        <a class="nav-link" href="<?= e(route_url('/explore', ['type' => 'business'])) ?>"<?= ($curRoute === '/explore' && ($_GET['type'] ?? '') === 'business') ? ' aria-current="page"' : '' ?>>Business &amp; Services</a>
                     </li>
                     <li>
                         <a class="nav-link" href="<?= e(route_url('/explore', ['tab' => 'work'])) ?>"<?= ($curRoute === '/explore' && ($_GET['tab'] ?? '') === 'work') ? ' aria-current="page"' : '' ?>>Clients</a>
@@ -75,6 +96,9 @@ $curRoute = $currentRoute ?? '/';
                             <a class="nav-link" href="<?= e(route_url('/dashboard')) ?>"<?= $curRoute === '/dashboard' ? ' aria-current="page"' : '' ?>>
                                 Studio Dashboard
                             </a>
+                        </li>
+                        <li>
+                            <a class="nav-link" href="<?= e(route_url('/account')) ?>"<?= $curRoute === '/account' ? ' aria-current="page"' : '' ?>>Account</a>
                         </li>
                         <li class="nav-cta-item">
                             <a class="btn btn-primary btn-nav" href="<?= e(route_url('/hire')) ?>"<?= $curRoute === '/hire' ? ' aria-current="page"' : '' ?>>
@@ -180,13 +204,13 @@ $curRoute = $currentRoute ?? '/';
         <div class="container">
             <div class="footer-grid">
                 <div>
-                    <h3>Highest-Demand Talent</h3>
+                    <h3>Popular Services</h3>
                     <ul class="footer-links">
-                        <li><a href="<?= e(route_url('/explore', ['category' => 'photography-video'])) ?>">Wedding &amp; Commercial Photographers</a></li>
-                        <li><a href="<?= e(route_url('/explore', ['category' => 'graphic-web-design'])) ?>">Brand &amp; UI/UX Designers</a></li>
-                        <li><a href="<?= e(route_url('/explore', ['category' => 'fashion-tailoring'])) ?>">Bespoke Suit &amp; Couture Tailors</a></li>
-                        <li><a href="<?= e(route_url('/explore', ['category' => 'events-catering'])) ?>">Executive &amp; Kwanjula Caterers</a></li>
-                        <li><a href="<?= e(route_url('/explore', ['category' => 'software-it'])) ?>">Software &amp; Web Engineers</a></li>
+                        <li><a href="<?= e(route_url('/explore', ['category' => 'home-repairs'])) ?>">Home Repairs &amp; Maintenance</a></li>
+                        <li><a href="<?= e(route_url('/explore', ['category' => 'solar-electrical'])) ?>">Solar &amp; Electrical</a></li>
+                        <li><a href="<?= e(route_url('/explore', ['category' => 'cleaning-home-services'])) ?>">Cleaning &amp; Home Services</a></li>
+                        <li><a href="<?= e(route_url('/explore', ['category' => 'events-catering'])) ?>">Events &amp; Catering</a></li>
+                        <li><a href="<?= e(route_url('/explore', ['category' => 'graphic-web-design'])) ?>">Graphic &amp; Web Design</a></li>
                     </ul>
                 </div>
                 <div>
@@ -231,11 +255,16 @@ $curRoute = $currentRoute ?? '/';
                     <span>&copy; Copyright 2010 &ndash; <?= date('Y') ?> Kopii Online Uganda</span>
                     <span>&middot;</span>
                     <span>0% Commission &middot; Transparent UGX Pricing</span>
+                    <span>&middot;</span>
+                    <a href="<?= e(route_url('/safety')) ?>">Safety tips</a>
+                    <a href="<?= e(route_url('/terms')) ?>">Terms</a>
+                    <a href="<?= e(route_url('/privacy')) ?>">Privacy</a>
+                    <a href="<?= e(route_url('/contact')) ?>">Contact</a>
                 </div>
             </div>
         </div>
     </footer>
 
-    <script src="<?= e(asset_url('assets/js/app.js')) ?>" defer></script>
+    <script src="<?= e(versioned_asset_url('assets/js/app.js')) ?>" defer></script>
 </body>
 </html>

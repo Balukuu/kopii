@@ -161,7 +161,7 @@ $worldDots = [
 <!-- 1. Hero (#D5D9E5 Stage + Intent Pill + Cutout + Chamfered Map Card + Peek Carousel) -->
 <section class="hero-home" data-home-hero>
     <div class="container">
-        <!-- Top Centered Segmented Intent Pill ("I'm looking for [Talent | Studios & Services]") -->
+        <!-- Top Centered Segmented Intent Pill ("I'm looking for [Talent | Business & Services]") -->
         <div class="hero-intent-bar" role="group" aria-label="Select hiring model">
             <span class="hero-intent-label">I&rsquo;m looking for</span>
             <div class="hero-intent-pills">
@@ -179,11 +179,11 @@ $worldDots = [
                     type="button"
                     class="hero-intent-pill"
                     aria-pressed="false"
-                    data-intent-mode="studios"
-                    data-intent-cta-label="Explore Studios &amp; Services"
+                    data-intent-mode="business"
+                    data-intent-cta-label="Explore Business &amp; Services"
                     data-intent-cta-href="<?= e(route_url('/hire', ['type' => 'business'])) ?>"
                 >
-                    Studios &amp; Services
+                    Business &amp; Services
                 </button>
             </div>
         </div>
@@ -194,9 +194,10 @@ $worldDots = [
                 <h1 data-hero-heading>
                     Find the <span class="hero-underline">Right Talent</span><br>Across Uganda
                 </h1>
-                <p class="hero-home-lead" data-hero-lead>
-                    Kopii is a free showcase marketplace for Ugandan photographers, brand designers, bespoke tailors, event producers, software developers, and other creatives. Browse real portfolios, compare itemized UGX packages, and hire directly with zero commission.
+                <p class="hero-home-lead">
+                    Kopii is where people, businesses, products and services come together. Whether you&rsquo;re looking for something or building your own, discover trusted businesses, find what you need, and connect with opportunities that move you forward.
                 </p>
+                <p class="hero-home-tagline">One Marketplace. Endless Possibilities.</p>
 
                 <a href="<?= e(route_url('/hire')) ?>" class="btn btn-hero-cta" data-hero-cta>
                     Hire Top Talent
@@ -348,7 +349,14 @@ $worldDots = [
                 </div>
 
                 <p class="visually-hidden" role="status" aria-live="polite" data-carousel-status></p>
-                <nav class="hero-carousel-markers" aria-label="Choose featured talent" data-carousel-markers></nav>
+                <div class="hero-carousel-footer">
+                    <nav class="hero-carousel-markers" aria-label="Choose featured talent" data-carousel-markers></nav>
+                    <!-- Shown by app.js once the carousel can rotate by itself; lets anyone stop the movement (WCAG 2.2.2). -->
+                    <button type="button" class="hero-autoplay-toggle" data-carousel-toggle hidden aria-label="Pause automatic rotation">
+                        <?= svg_icon('pause', 16, 'icon-pause') ?>
+                        <?= svg_icon('play', 16, 'icon-play') ?>
+                    </button>
+                </div>
             </div>
         <?php endif; ?>
     </div>

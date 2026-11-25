@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS providers (
     bio TEXT NOT NULL,
     city TEXT NOT NULL DEFAULT 'Kampala',
     neighborhood TEXT DEFAULT NULL,
+    service_areas TEXT DEFAULT NULL,
     phone TEXT NOT NULL,
     whatsapp TEXT NOT NULL,
     public_email TEXT DEFAULT NULL,
@@ -254,3 +255,28 @@ CREATE TABLE IF NOT EXISTS opportunity_responses (
 );
 
 CREATE INDEX IF NOT EXISTS idx_opportunity_responses_provider ON opportunity_responses (provider_id, created_at);
+
+-- Messages to the Kopii team: the contact form (kind = contact) and "report this listing" (kind = report).
+-- A report names what it is about (target_type + target_id) and keeps the title as it was, so the
+-- admin inbox still reads properly after the listing is deleted. user_id is set when the sender was signed in.
+CREATE TABLE IF NOT EXISTS support_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL DEFAULT 'contact',
+    user_id INTEGER DEFAULT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL DEFAULT '',
+    message TEXT NOT NULL,
+    target_type TEXT DEFAULT NULL,
+    target_id INTEGER DEFAULT NULL,
+    target_label TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open',
+    handled_by INTEGER DEFAULT NULL,
+    handled_at TEXT DEFAULT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_messages_status ON support_messages (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_support_messages_target ON support_messages (target_type, target_id);

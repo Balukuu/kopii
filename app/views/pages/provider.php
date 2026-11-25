@@ -72,7 +72,7 @@ $authUser  = current_user();
                     </p>
 
                     <div class="card-meta-line profile-meta">
-                        <span><?= svg_icon('map-pin', 16) ?> <span><strong><?= e($provider['city']) ?></strong><?= !empty($provider['neighborhood']) ? ', ' . e($provider['neighborhood']) : '' ?>, Uganda</span></span>
+                        <span><?= svg_icon('map-pin', 16) ?> <span><strong><?= e($provider['city']) ?></strong><?= !empty($provider['neighborhood']) ? ', ' . e($provider['neighborhood']) : '' ?><?= !empty($provider['service_areas']) ? ' &middot; also serves ' . e(text_excerpt((string) $provider['service_areas'], 60)) : ', Uganda' ?></span></span>
                         <span><?= svg_icon('clock', 16) ?> <span>Replies: <?= e($provider['response_time']) ?></span></span>
                         <span><span><strong class="tnum"><?= (int) $provider['years_experience'] ?>+ yrs</strong> experience</span></span>
                         <?php if ((int) $provider['review_count'] > 0): ?>
@@ -314,15 +314,43 @@ $authUser  = current_user();
                 </a>
             </div>
 
+            <?php if (!empty($provider['is_verified'])): ?>
+                <div class="trust-box">
+                    <strong><?= svg_icon('verified', 16) ?> Verified by Kopii<?= !empty($provider['verified_at']) ? ' on ' . e(date('j M Y', (int) strtotime((string) $provider['verified_at']))) : '' ?></strong>
+                    <ul>
+                        <li><?= svg_icon('check', 16) ?> Phone number confirmed</li>
+                        <li><?= svg_icon('check', 16) ?> Portfolio reviewed</li>
+                        <li><?= svg_icon('check', 16) ?> Pricing is clear</li>
+                    </ul>
+                    <span class="hint">Checked by hand by the Kopii team. It is not a guarantee, so still agree the work in writing.</span>
+                </div>
+            <?php else: ?>
+                <div class="trust-box is-pending">
+                    <strong>Not verified yet</strong>
+                    <span class="hint">The Kopii team has not checked this provider yet. Ask for photos of their past work before you agree anything.</span>
+                </div>
+            <?php endif; ?>
+
             <div class="risk-free-box">
                 <?= svg_icon('shield', 20) ?>
-                <span><strong>Kopii Direct:</strong> 0% platform commission. Agree on scope and UGX deliverables directly with the provider, and confirm them in writing before you pay.</span>
+                <span><strong>Before you pay:</strong> ask for photos of past work, agree the scope and price in writing (WhatsApp counts), and never pay in full upfront. Kopii takes no commission and no payment. <a href="<?= e(route_url('/safety')) ?>">Read the safety tips</a>.</span>
             </div>
 
             <dl class="facts">
                 <div class="row-between">
-                    <dt class="text-muted">Base Location</dt>
-                    <dd class="dd-strong"><?= e($provider['city']) ?>, Uganda</dd>
+                    <dt class="text-muted">Based in</dt>
+                    <dd class="dd-strong"><?= !empty($provider['neighborhood']) ? e($provider['neighborhood']) . ', ' : '' ?><?= e($provider['city']) ?></dd>
+                </div>
+                <?php $servedAreas = area_list($provider['service_areas'] ?? ''); ?>
+                <?php if (!empty($servedAreas)): ?>
+                    <div class="row-between">
+                        <dt class="text-muted">Also serves</dt>
+                        <dd class="dd-strong" style="margin:0; text-align:end; min-inline-size:0; overflow-wrap:anywhere;"><?= e(implode(', ', $servedAreas)) ?></dd>
+                    </div>
+                <?php endif; ?>
+                <div class="row-between">
+                    <dt class="text-muted">On Kopii since</dt>
+                    <dd class="dd-strong"><?= e(date('M Y', (int) strtotime((string) $provider['created_at']))) ?></dd>
                 </div>
                 <div class="row-between">
                     <dt class="text-muted">Typical Response</dt>
@@ -348,6 +376,10 @@ $authUser  = current_user();
                     </div>
                 <?php endif; ?>
             </dl>
+
+            <?php if ($provider['status'] === 'active' && (int) (current_user()['id'] ?? 0) !== (int) $provider['user_id']): ?>
+                <?php View::partial('report_box', ['targetType' => 'provider', 'targetId' => (int) $provider['id'], 'noun' => 'listing']); ?>
+            <?php endif; ?>
         </aside>
     </div>
 
@@ -438,7 +470,7 @@ $authUser  = current_user();
             </div>
 
             <div class="field">
-                <label for="q-email">Your Email Address *</label>
+                <label for="q-email">Email (Optional)</label>
                 <input
                     type="email"
                     id="q-email"
@@ -449,9 +481,9 @@ $authUser  = current_user();
                     autocapitalize="none"
                     spellcheck="false"
                     data-error="q-email-err"
-                    required
                 >
-                <div id="q-email-err" class="error-msg">Please enter a valid email address (e.g. name@example.com).</div>
+                <span class="hint">The provider replies by phone or WhatsApp. Add an email only if you also want replies there.</span>
+                <div id="q-email-err" class="error-msg">That email address does not look right. Fix it, or leave it blank.</div>
             </div>
 
             <div class="form-row-2">
@@ -482,6 +514,8 @@ $authUser  = current_user();
                 ><?= e(old('project_details')) ?></textarea>
                 <div id="q-details-err" class="error-msg">Please share a brief description of what you need (at least 8 characters).</div>
             </div>
+
+            <p class="hint form-privacy">Your details go to the provider you are contacting so they can reply. See our <a href="<?= e(route_url('/privacy')) ?>">Privacy Policy</a>.</p>
 
             <div style="display:flex; justify-content:flex-end; gap:0.65rem;">
                 <button type="button" class="btn btn-outline" data-close-modal>Cancel</button>

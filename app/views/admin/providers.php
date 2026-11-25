@@ -2,7 +2,7 @@
 defined('KOPII_APP') or exit('Direct access denied.');
 /**
  * @var array $providers rows from AdminModel::providerList()
- * @var array $filters   q, status, verified, featured
+ * @var array $filters   q, status, verified, featured, portfolio
  * @var int   $page
  * @var int   $pages
  * @var int   $total
@@ -39,6 +39,13 @@ $activeFilters = array_filter($filters, static fn($v) => $v !== '');
                 <select id="f-featured" name="featured">
                     <option value="">Any</option>
                     <option value="1"<?= $filters['featured'] === '1' ? ' selected' : '' ?>>Featured only</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="f-portfolio">Portfolio</label>
+                <select id="f-portfolio" name="portfolio">
+                    <option value="">Any</option>
+                    <option value="thin"<?= $filters['portfolio'] === 'thin' ? ' selected' : '' ?>>Thin: fewer than 3 photos</option>
                 </select>
             </div>
             <div class="cell-actions">

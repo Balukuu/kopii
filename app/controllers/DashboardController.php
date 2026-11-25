@@ -52,6 +52,16 @@ class DashboardController
             $editing = ProductModel::findOwned((int) $_GET['edit'], (int) $provider['id']);
         }
 
+        // "Edit" on a package or a portfolio item opens the side form filled in with it.
+        $editingPackage = null;
+        if ($tab === 'packages' && ctype_digit((string) ($_GET['edit'] ?? ''))) {
+            $editingPackage = ProviderModel::findPackage((int) $_GET['edit'], (int) $provider['id']);
+        }
+        $editingItem = null;
+        if ($tab === 'portfolio' && ctype_digit((string) ($_GET['edit'] ?? ''))) {
+            $editingItem = ProviderModel::findPortfolioItem((int) $_GET['edit'], (int) $provider['id']);
+        }
+
         // Compute profile completeness score
         $checks = [
             'Bio & Headline'    => strlen((string) $provider['bio']) >= 40,
@@ -81,6 +91,8 @@ class DashboardController
             'priceUnits'    => $uganda['price_units'],
             'products'      => $products,
             'editing'       => $editing,
+            'editingPackage' => $editingPackage,
+            'editingItem'   => $editingItem,
             'productCategories' => ProductModel::categories(),
             'productUnits'  => $uganda['product_units'],
             'productConditions' => $uganda['product_conditions'],
@@ -108,6 +120,7 @@ class DashboardController
             'bio'                => trim((string) ($post['bio'] ?? ($current['bio'] ?? ''))),
             'city'               => trim((string) ($post['city'] ?? ($current['city'] ?? 'Kampala'))),
             'neighborhood'       => trim((string) ($post['neighborhood'] ?? ($current['neighborhood'] ?? ''))),
+            'service_areas'      => trim((string) ($post['service_areas'] ?? ($current['service_areas'] ?? ''))),
             'phone'              => trim((string) ($post['phone'] ?? ($current['phone'] ?? ''))),
             'whatsapp'           => trim((string) ($post['whatsapp'] ?? ($current['whatsapp'] ?? ''))),
             'public_email'       => trim((string) ($post['public_email'] ?? ($current['public_email'] ?? ''))),
@@ -166,6 +179,13 @@ class DashboardController
         }
         if (text_length($c['neighborhood']) > 80 || text_length($c['specialties']) > 300) {
             $problems[] = 'Neighborhood (80) and specialties (300) are too long.';
+        }
+
+        $areas = normalize_area_list($c['service_areas']);
+        if ($areas === null) {
+            $problems[] = 'List up to 12 other places you serve, each up to 40 characters, separated by commas.';
+        } else {
+            $c['service_areas'] = $areas;
         }
 
         $c['starting_price_ugx'] = min(max($c['starting_price_ugx'], 0), 1000000000);
@@ -281,17 +301,9 @@ class DashboardController
             redirect_to('/dashboard');
         }
 
-        $title       = trim((string) ($_POST['title'] ?? ''));
-        $tag         = trim((string) ($_POST['project_tag'] ?? ''));
-        $description = trim((string) ($_POST['description'] ?? ''));
-        $location    = trim((string) ($_POST['client_location'] ?? ''));
-
-        if ($title === '') {
-            flash('error', 'Please enter a title for your portfolio work item.');
-            redirect_to('/dashboard', ['tab' => 'portfolio']);
-        }
-        if (text_length($title) > 120 || text_length($tag) > 60 || text_length($description) > 1000 || text_length($location) > 120) {
-            flash('error', 'One of those fields is too long. Title 120, tag 60, description 1,000 and location 120 characters at most.');
+        [$clean, $problem] = self::cleanPortfolio($_POST);
+        if ($problem !== null) {
+            flash('error', $problem);
             redirect_to('/dashboard', ['tab' => 'portfolio']);
         }
         if (count(ProviderModel::getPortfolio((int) $provider['id'])) >= self::MAX_PORTFOLIO_ITEMS) {
@@ -305,14 +317,7 @@ class DashboardController
                 throw new UserFacingException('Please choose a photo (JPG, PNG, or WebP) to showcase your work.');
             }
 
-            ProviderModel::addPortfolioItem((int) $provider['id'], [
-                'title'           => $title,
-                'project_tag'     => $tag,
-                'description'     => $description,
-                'image_path'      => $imgPath,
-                'client_location' => $location,
-                'is_featured'     => !empty($_POST['is_featured']) ? 1 : 0,
-            ]);
+            ProviderModel::addPortfolioItem((int) $provider['id'], $clean + ['image_path' => $imgPath]);
 
             flash('success', 'Work sample added to your public portfolio!');
         } catch (Throwable $e) {
@@ -348,24 +353,10 @@ class DashboardController
             redirect_to('/dashboard');
         }
 
-        $uganda       = require KOPII_ROOT . '/app/config/uganda.php';
-        $name         = trim((string) ($_POST['name'] ?? ''));
-        $price        = (int) preg_replace('/\D+/', '', (string) ($_POST['price_ugx'] ?? '0'));
-        $unit         = trim((string) ($_POST['price_unit'] ?? 'per session'));
-        $turnaround   = trim((string) ($_POST['turnaround'] ?? ''));
-        $description  = trim((string) ($_POST['description'] ?? ''));
-        $deliverables = trim((string) ($_POST['deliverables'] ?? ''));
-
-        if ($name === '' || $price <= 0) {
-            flash('error', 'Please enter both a package name and a price in UGX.');
-            redirect_to('/dashboard', ['tab' => 'packages']);
-        }
-        if ($price > 1000000000 || !in_array($unit, $uganda['price_units'], true)) {
-            flash('error', 'Please enter a price up to UGX 1,000,000,000 and choose a price unit from the list.');
-            redirect_to('/dashboard', ['tab' => 'packages']);
-        }
-        if (text_length($name) > 100 || text_length($turnaround) > 80 || text_length($description) > 500 || text_length($deliverables) > 1000) {
-            flash('error', 'One of those fields is too long. Name 100, turnaround 80, description 500 and deliverables 1,000 characters at most.');
+        $uganda = require KOPII_ROOT . '/app/config/uganda.php';
+        [$clean, $problem] = self::cleanPackage($_POST, $uganda);
+        if ($problem !== null) {
+            flash('error', $problem);
             redirect_to('/dashboard', ['tab' => 'packages']);
         }
         if (count(ProviderModel::getPackages((int) $provider['id'])) >= self::MAX_PACKAGES) {
@@ -373,15 +364,7 @@ class DashboardController
             redirect_to('/dashboard', ['tab' => 'packages']);
         }
 
-        ProviderModel::addPackage((int) $provider['id'], [
-            'name'         => $name,
-            'price_ugx'    => $price,
-            'price_unit'   => $unit,
-            'turnaround'   => $turnaround,
-            'description'  => $description,
-            'deliverables' => $deliverables,
-            'is_popular'   => !empty($_POST['is_popular']) ? 1 : 0,
-        ]);
+        ProviderModel::addPackage((int) $provider['id'], $clean);
 
         flash('success', 'Service package added to your profile!');
         redirect_to('/dashboard', ['tab' => 'packages']);
@@ -397,6 +380,137 @@ class DashboardController
             flash('success', 'Service package deleted.');
         }
         redirect_to('/dashboard', ['tab' => 'packages']);
+    }
+
+    public function updatePortfolio(): void
+    {
+        $user = require_auth();
+        verify_csrf();
+        $provider = ProviderModel::findByUserId((int) $user['id']);
+        if (!$provider) {
+            redirect_to('/dashboard');
+        }
+
+        $itemId = (int) ($_POST['item_id'] ?? 0);
+        $item   = $itemId > 0 ? ProviderModel::findPortfolioItem($itemId, (int) $provider['id']) : null;
+        if ($item === null) {
+            flash('error', 'That work sample no longer exists.');
+            redirect_to('/dashboard', ['tab' => 'portfolio']);
+        }
+
+        [$clean, $problem] = self::cleanPortfolio($_POST);
+        if ($problem !== null) {
+            flash('error', 'Nothing was saved. ' . $problem);
+            redirect_to('/dashboard', ['tab' => 'portfolio', 'edit' => (string) $itemId]);
+        }
+
+        $newImage = null;
+        try {
+            // A new photo is optional: without one the current photo stays.
+            $newImage = upload_image($_FILES['portfolio_image'] ?? [], 'portfolios');
+            $data     = $newImage !== null ? $clean + ['image_path' => $newImage] : $clean;
+
+            if (!ProviderModel::updatePortfolioItem($itemId, (int) $provider['id'], $data)) {
+                throw new UserFacingException('That work sample no longer exists.');
+            }
+            if ($newImage !== null) {
+                delete_upload((string) $item['image_path']);
+            }
+            flash('success', 'Work sample updated.');
+        } catch (Throwable $e) {
+            // Nothing was saved, so don't keep a photo uploaded during this failed attempt.
+            delete_upload($newImage);
+            flash('error', report_exception($e, 'We could not save your changes. Please try again.'));
+            redirect_to('/dashboard', ['tab' => 'portfolio', 'edit' => (string) $itemId]);
+        }
+
+        redirect_to('/dashboard', ['tab' => 'portfolio']);
+    }
+
+    public function updatePackage(): void
+    {
+        $user = require_auth();
+        verify_csrf();
+        $provider = ProviderModel::findByUserId((int) $user['id']);
+        if (!$provider) {
+            redirect_to('/dashboard');
+        }
+
+        $packageId = (int) ($_POST['package_id'] ?? 0);
+        if ($packageId <= 0 || ProviderModel::findPackage($packageId, (int) $provider['id']) === null) {
+            flash('error', 'That package no longer exists.');
+            redirect_to('/dashboard', ['tab' => 'packages']);
+        }
+
+        $uganda = require KOPII_ROOT . '/app/config/uganda.php';
+        [$clean, $problem] = self::cleanPackage($_POST, $uganda);
+        if ($problem !== null) {
+            flash('error', 'Nothing was saved. ' . $problem);
+            redirect_to('/dashboard', ['tab' => 'packages', 'edit' => (string) $packageId]);
+        }
+
+        try {
+            ProviderModel::updatePackage($packageId, (int) $provider['id'], $clean);
+            flash('success', 'Package updated.');
+        } catch (Throwable $e) {
+            flash('error', report_exception($e, 'We could not save your changes. Please try again.'));
+            redirect_to('/dashboard', ['tab' => 'packages', 'edit' => (string) $packageId]);
+        }
+
+        redirect_to('/dashboard', ['tab' => 'packages']);
+    }
+
+    /**
+     * Validate and tidy a portfolio item's text fields (shared by "add" and "edit").
+     *
+     * @return array{0: array, 1: ?string} cleaned values and the first problem, written for the visitor
+     */
+    private static function cleanPortfolio(array $post): array
+    {
+        $c = [
+            'title'           => trim((string) ($post['title'] ?? '')),
+            'project_tag'     => trim((string) ($post['project_tag'] ?? '')),
+            'description'     => trim((string) ($post['description'] ?? '')),
+            'client_location' => trim((string) ($post['client_location'] ?? '')),
+            'is_featured'     => !empty($post['is_featured']) ? 1 : 0,
+        ];
+
+        if ($c['title'] === '') {
+            return [$c, 'Please enter a title for your portfolio work item.'];
+        }
+        if (text_length($c['title']) > 120 || text_length($c['project_tag']) > 60 || text_length($c['description']) > 1000 || text_length($c['client_location']) > 120) {
+            return [$c, 'One of those fields is too long. Title 120, tag 60, description 1,000 and location 120 characters at most.'];
+        }
+        return [$c, null];
+    }
+
+    /**
+     * Validate and tidy a service package (shared by "add" and "edit").
+     *
+     * @return array{0: array, 1: ?string} cleaned values and the first problem, written for the visitor
+     */
+    private static function cleanPackage(array $post, array $uganda): array
+    {
+        $c = [
+            'name'         => trim((string) ($post['name'] ?? '')),
+            'price_ugx'    => (int) preg_replace('/\D+/', '', (string) ($post['price_ugx'] ?? '0')),
+            'price_unit'   => trim((string) ($post['price_unit'] ?? 'per session')),
+            'turnaround'   => trim((string) ($post['turnaround'] ?? '')),
+            'description'  => trim((string) ($post['description'] ?? '')),
+            'deliverables' => trim((string) ($post['deliverables'] ?? '')),
+            'is_popular'   => !empty($post['is_popular']) ? 1 : 0,
+        ];
+
+        if ($c['name'] === '' || $c['price_ugx'] <= 0) {
+            return [$c, 'Please enter both a package name and a price in UGX.'];
+        }
+        if ($c['price_ugx'] > 1000000000 || !in_array($c['price_unit'], $uganda['price_units'], true)) {
+            return [$c, 'Please enter a price up to UGX 1,000,000,000 and choose a price unit from the list.'];
+        }
+        if (text_length($c['name']) > 100 || text_length($c['turnaround']) > 80 || text_length($c['description']) > 500 || text_length($c['deliverables']) > 1000) {
+            return [$c, 'One of those fields is too long. Name 100, turnaround 80, description 500 and deliverables 1,000 characters at most.'];
+        }
+        return [$c, null];
     }
 
     public function updateInquiryStatus(): void

@@ -34,7 +34,7 @@ final class Notifier
                 '',
                 'From:   ' . $clientName,
                 'Phone:  ' . $clientPhone,
-                'Email:  ' . (string) ($lead['client_email'] ?? ''),
+                'Email:  ' . (trim((string) ($lead['client_email'] ?? '')) !== '' ? (string) $lead['client_email'] : 'not given: reply by phone or WhatsApp'),
             ];
             if (!empty($lead['event_date'])) {
                 $lines[] = 'Date:   ' . self::limit((string) $lead['event_date'], 60);
@@ -361,13 +361,125 @@ final class Notifier
         }
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Messages to the team, and account changes
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * Who hears about a contact message or a report: the support address from env.php when there is
+     * one, otherwise every administrator. The message is already stored in the admin inbox by now, so
+     * this email is only the nudge.
+     *
+     * @return list<string>
+     */
+    public static function teamRecipients(): array
+    {
+        $support = trim((string) app_config('support_email', ''));
+        if ($support !== '' && filter_var($support, FILTER_VALIDATE_EMAIL)) {
+            return [$support];
+        }
+        return AdminModel::adminEmails();
+    }
+
+    /**
+     * Tell the team that someone wrote to them or reported a listing. Reply-To is the sender when they
+     * gave an address, so replying goes straight to them.
+     *
+     * @param array $m row from SupportModel::find()
+     */
+    public static function teamMessage(array $m): void
+    {
+        try {
+            $recipients = self::teamRecipients();
+            if (empty($recipients)) {
+                return;
+            }
+
+            $isReport = (string) $m['kind'] === SupportModel::REPORT;
+            $lines    = [$isReport ? 'Someone reported a listing on Kopii.' : 'Someone wrote to Kopii through the contact page.', ''];
+
+            if ($isReport) {
+                $lines[] = 'About:   ' . self::limit((string) $m['target_label'], 160) . ' (' . (string) $m['target_type'] . ')';
+                $lines[] = 'Reason:  ' . self::limit((string) $m['subject'], 120);
+            } else {
+                $lines[] = 'Topic:   ' . self::limit((string) $m['subject'], 120);
+            }
+            $lines[] = 'From:    ' . (trim((string) $m['name']) !== '' ? self::limit((string) $m['name'], 80) : 'Anonymous')
+                . (trim((string) $m['email']) !== '' ? ' <' . $m['email'] . '>' : ' (no email given)');
+            $lines[] = '';
+            $lines[] = self::limit((string) $m['message'], 1500);
+            $lines[] = '';
+            $lines[] = 'Open it in the admin inbox: ' . absolute_url('/admin/inbox', ['status' => 'open']);
+
+            $subject = ($isReport ? 'Report: ' . self::limit((string) $m['target_label'], 60) : 'Contact: ' . self::limit((string) $m['subject'], 60)) . ' — Kopii';
+            foreach ($recipients as $to) {
+                Mailer::send($to, $subject, implode("\n", $lines), (string) ($m['email'] ?? ''));
+            }
+        } catch (Throwable $e) {
+            error_log('[Kopii] team message email failed: ' . $e->getMessage());
+        }
+    }
+
+    /** Sent to the OLD address when the sign-in email changes, so a hijacked account cannot change it silently. */
+    public static function emailChanged(string $oldEmail, array $user, string $newEmail): void
+    {
+        try {
+            $body = implode("\n", [
+                'Hi ' . self::firstName((string) ($user['full_name'] ?? '')) . ',',
+                '',
+                'The sign-in email for your Kopii account was just changed from this address to ' . $newEmail . '.',
+                '',
+                "If that was you, there's nothing more to do. If it wasn't, please " . self::reachUs() . ' right away.',
+            ]);
+            Mailer::send($oldEmail, 'Your Kopii email address was changed', $body);
+        } catch (Throwable $e) {
+            error_log('[Kopii] email-changed notice failed: ' . $e->getMessage());
+        }
+    }
+
+    public static function accountDeleted(string $email, string $fullName): void
+    {
+        try {
+            $body = implode("\n", [
+                'Hi ' . self::firstName($fullName) . ',',
+                '',
+                'Your Kopii account has been deleted, along with your listing, photos, products, opportunities and reviews.',
+                '',
+                "If you didn't ask for this, please " . self::reachUs() . ' right away.',
+            ]);
+            Mailer::send($email, 'Your Kopii account was deleted', $body);
+        } catch (Throwable $e) {
+            error_log('[Kopii] account-deleted email failed: ' . $e->getMessage());
+        }
+    }
+
+    /** Proof that outgoing email works, sent by an administrator from the health check. Returns whether the mail system accepted it. */
+    public static function testEmail(string $to): bool
+    {
+        try {
+            return Mailer::send($to, 'Kopii test email', implode("\n", [
+                'This is a test email from your Kopii site (' . absolute_url('/') . ').',
+                '',
+                'If you can read this in your inbox, lead alerts, password resets and confirmation links can reach people.',
+                'If it landed in spam, set up SPF and DKIM for your domain in cPanel (Email Deliverability).',
+            ]));
+        } catch (Throwable $e) {
+            error_log('[Kopii] test email failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     /** How to reach the team. Set 'support_email' in app/config/env.php to give a real address. */
     private static function contactLine(): string
     {
+        return 'If you think this is a mistake, please ' . self::reachUs() . '.';
+    }
+
+    /** "write to us at support@..." when env.php names a support address, otherwise "get in touch with the Kopii team". */
+    private static function reachUs(): string
+    {
         $support = trim((string) app_config('support_email', ''));
-        return $support !== ''
-            ? 'If you think this is a mistake, write to us at ' . $support . '.'
-            : 'If you think this is a mistake, please get in touch with the Kopii team.';
+        return $support !== '' ? 'write to us at ' . $support : 'get in touch with the Kopii team';
     }
 
     private static function firstName(string $fullName): string

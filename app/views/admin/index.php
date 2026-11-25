@@ -1,24 +1,32 @@
 <?php
 defined('KOPII_APP') or exit('Direct access denied.');
 /**
- * @var array $attention pending_reviews, unverified_providers, unconfirmed_emails
+ * @var array $attention pending_reviews, unverified_providers, unconfirmed_emails, open_messages
+ * @var array $health    checks from SiteHealth::checks()
  * @var array $week      accounts, listings, products, opportunities, proposals, inquiries, reviews (last 7 days)
  * @var array $stats     providers, portfolios, cities, reviews
  * @var int   $hidden    listings that are not public
  * @var array $recent    latest admin_log rows
  */
 View::partial('admin_header', ['adminTab' => $adminTab]);
-$allClear = (int) $attention['pending_reviews'] === 0 && (int) $attention['unverified_providers'] === 0;
+$allClear = (int) $attention['pending_reviews'] === 0 && (int) $attention['unverified_providers'] === 0 && (int) $attention['open_messages'] === 0;
+$healthCount = SiteHealth::summary($health);
+$levelLabel  = [SiteHealth::OK => 'Fine', SiteHealth::WARN => 'Review', SiteHealth::FAIL => 'Fix'];
 ?>
 <section class="section-pad-sm">
     <div class="container">
         <h2 class="admin-section-title">Needs your attention</h2>
 
         <?php if ($allClear): ?>
-            <p class="all-clear"><?= svg_icon('check', 16) ?> You are all caught up: no reviews are waiting and every live listing is Verified.</p>
+            <p class="all-clear"><?= svg_icon('check', 16) ?> You are all caught up: no reviews or messages are waiting and every live listing is Verified.</p>
         <?php endif; ?>
 
         <div class="attention-grid">
+            <a class="attention-card<?= (int) $attention['open_messages'] > 0 ? ' is-urgent' : '' ?>" href="<?= e(route_url('/admin/inbox', ['status' => 'open'])) ?>">
+                <span class="attention-label">Messages &amp; reports</span>
+                <strong class="tnum"><?= (int) $attention['open_messages'] ?></strong>
+                <span class="attention-hint">Contact messages and reported listings nobody has dealt with yet.</span>
+            </a>
             <a class="attention-card<?= (int) $attention['pending_reviews'] > 0 ? ' is-urgent' : '' ?>" href="<?= e(route_url('/admin/reviews', ['status' => 'pending'])) ?>">
                 <span class="attention-label">Reviews waiting</span>
                 <strong class="tnum"><?= (int) $attention['pending_reviews'] ?></strong>
@@ -34,6 +42,34 @@ $allClear = (int) $attention['pending_reviews'] === 0 && (int) $attention['unver
                 <strong class="tnum"><?= (int) $attention['unconfirmed_emails'] ?></strong>
                 <span class="attention-hint">Accounts that have not confirmed their address. You can resend the link.</span>
             </a>
+        </div>
+
+        <h2 class="admin-section-title">Is the site ready to go live?</h2>
+        <div class="admin-card" id="health">
+            <p class="health-summary">
+                <?php if ($healthCount['fail'] > 0): ?>
+                    <strong><?= (int) $healthCount['fail'] ?> to fix</strong>
+                <?php else: ?>
+                    <strong>Nothing to fix</strong>
+                <?php endif; ?>
+                &middot; <?= (int) $healthCount['warn'] ?> to review &middot; <?= (int) $healthCount['ok'] ?> fine
+            </p>
+            <ul class="health-list">
+                <?php foreach ($health as $check): ?>
+                    <li class="health-<?= e($check['level']) ?>">
+                        <span class="health-flag"><?= e($levelLabel[$check['level']] ?? '') ?></span>
+                        <span>
+                            <strong><?= e($check['title']) ?></strong>
+                            <span class="health-detail"><?= e($check['detail']) ?></span>
+                        </span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+            <form method="POST" action="<?= e(route_url('/admin/health/test-email')) ?>">
+                <?= csrf_field() ?>
+                <button type="submit" class="btn btn-outline btn-sm"><?= svg_icon('mail', 16) ?> Send a test email to me</button>
+                <span class="hint">Proves that lead alerts, password resets and confirmation links can reach an inbox.</span>
+            </form>
         </div>
 
         <h2 class="admin-section-title">Last 7 days</h2>

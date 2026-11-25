@@ -80,6 +80,8 @@ class ShopController
             'pageTitle'       => $product['name'] . ' — ' . $product['business_name'] . ' | Kopii Shop',
             'metaDescription' => text_excerpt((string) ($product['description'] ?? ''), 155) ?: $product['name'] . ' from ' . $product['business_name'],
             'currentRoute'    => '/shop',
+            'ogImage'         => share_image_path($product['images'][0]['image_path'] ?? null),
+            'noindex'         => !$isPublic,
             'product'         => $product,
             'isPublic'        => $isPublic,
             'isOwner'         => $isOwner,

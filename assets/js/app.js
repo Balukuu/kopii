@@ -70,21 +70,20 @@
     const hero = document.querySelector('[data-home-hero]');
     if (!hero) return;
 
-    // A. Top "I'm looking for [Talent | Studios & Services]" Intent Switcher
+    // A. Top "I'm looking for [Talent | Business & Services]" Intent Switcher
     const intentBtns = [...hero.querySelectorAll('[data-intent-mode]')];
     const headingEl = hero.querySelector('[data-hero-heading]');
-    const leadEl = hero.querySelector('[data-hero-lead]');
     const ctaEl = hero.querySelector('[data-hero-cta]');
 
     const renderHeading = (mode) => {
       if (!headingEl) return;
       headingEl.textContent = '';
-      if (mode === 'studios') {
-        headingEl.append('Hire ');
+      if (mode === 'business') {
+        headingEl.append('Discover Trusted', document.createElement('br'));
         const u = document.createElement('span');
         u.className = 'hero-underline';
-        u.textContent = 'Local Studios';
-        headingEl.append(u, ' &', document.createElement('br'), 'Service Teams');
+        u.textContent = 'Businesses';
+        headingEl.append(u, ' & Services');
       } else {
         headingEl.append('Find the ');
         const u = document.createElement('span');
@@ -99,11 +98,6 @@
         const mode = btn.getAttribute('data-intent-mode') || 'talent';
         intentBtns.forEach((b) => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
         renderHeading(mode);
-        if (leadEl) {
-          leadEl.textContent = mode === 'studios'
-            ? 'Find photography houses, wedding & summit caterers, bespoke fashion ateliers, and digital agencies across Uganda — with upfront UGX packages and direct contact.'
-            : 'Kopii is a free showcase marketplace for Ugandan photographers, brand designers, bespoke tailors, event producers, software developers, and other creatives. Browse real portfolios, compare itemized UGX packages, and hire directly with zero commission.';
-        }
         if (ctaEl) {
           ctaEl.textContent = btn.getAttribute('data-intent-cta-label') || 'Hire Top Talent';
           ctaEl.href = btn.getAttribute('data-intent-cta-href') || '/hire';
@@ -148,18 +142,8 @@
       return mBtn;
     });
 
-    const syncStageFromSlide = (slide) => {
-      if (!slide) return;
-      const idx = Number(slide.getAttribute('data-slide-index') || 0);
-
-      slides.forEach((s, i) => {
-        const cardBtn = s.querySelector('.hero-slide-btn');
-        cardBtn?.setAttribute('aria-current', i === idx ? 'true' : 'false');
-      });
-      markerBtns.forEach((m, i) => {
-        m.setAttribute('aria-current', i === idx ? 'true' : 'false');
-      });
-
+    // Writes one slide's details into the big portrait + card (no animation; swapStage wraps it).
+    const applyStage = (slide) => {
       const person = slide.getAttribute('data-person') || '';
       const url = slide.getAttribute('data-url') || '#';
       const portrait = slide.getAttribute('data-portrait') || '';
@@ -208,6 +192,83 @@
         const pinDot = mapEl.querySelector('.hero-map-pin');
         if (pinDot) pinDot.title = `${city}, Uganda`;
       }
+    };
+
+    // Autoplay state lives up here because slide changes (from any source) reset its progress.
+    const AUTOPLAY_MS = 6500;
+    const LEAVE_MS = 200;
+    const stageEl = hero.querySelector('[data-hero-stage]');
+    const toggleBtn = carousel.querySelector('[data-carousel-toggle]');
+    const holds = new Set(); // reasons the clock is stopped: hover, focus, touch, offscreen, hidden
+    let autoplayOn = !prefersReducedMotion.matches; // the user's choice (the pause button)
+    let progress = 0;
+    let lastFrame = 0;
+    let lastScrollAt = 0;
+    let frameId = 0;
+    let stageSlide = null;
+    let swapToken = 0;
+    let shownIdx = -1;
+
+    const paintProgress = () => {
+      const m = markerBtns[shownIdx];
+      if (m) m.style.setProperty('--p', progress.toFixed(4));
+    };
+
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // Fade the old person out towards the carousel's direction of travel, swap, let the new one settle in.
+    const swapStage = (slide, instant) => {
+      const from = stageSlide;
+      stageSlide = slide;
+      const token = ++swapToken;
+
+      if (instant || !from || !stageEl || prefersReducedMotion.matches) {
+        stageEl?.classList.remove('is-leaving');
+        applyStage(slide);
+        return;
+      }
+
+      const n = slides.length;
+      const fromIdx = Number(from.getAttribute('data-slide-index') || 0);
+      const toIdx = Number(slide.getAttribute('data-slide-index') || 0);
+      const forward = ((toIdx - fromIdx + n) % n) <= n / 2;
+      stageEl.style.setProperty('--hero-shift', forward ? '1' : '-1');
+      stageEl.classList.add('is-leaving');
+
+      // Have the next portrait decoded before it appears, but never leave the stage blank for long.
+      const next = new Image();
+      next.src = slide.getAttribute('data-portrait') || '';
+      const decoded = next.decode ? next.decode().catch(() => {}) : Promise.resolve();
+
+      Promise.all([wait(LEAVE_MS), Promise.race([decoded, wait(700)])]).then(() => {
+        if (token !== swapToken) return; // a newer swap took over
+        applyStage(slide);
+        stageEl.classList.add('is-prep'); // park the new content on the arriving side, no transition
+        stageEl.classList.remove('is-leaving');
+        void stageEl.offsetWidth;
+        stageEl.classList.remove('is-prep'); // then transition to rest
+      });
+    };
+
+    const syncStageFromSlide = (slide, instant = false) => {
+      if (!slide) return;
+      const idx = Number(slide.getAttribute('data-slide-index') || 0);
+
+      slides.forEach((s, i) => {
+        const cardBtn = s.querySelector('.hero-slide-btn');
+        cardBtn?.setAttribute('aria-current', i === idx ? 'true' : 'false');
+      });
+      markerBtns.forEach((m, i) => {
+        m.setAttribute('aria-current', i === idx ? 'true' : 'false');
+        if (i !== idx) m.style.removeProperty('--p');
+      });
+
+      if (idx !== shownIdx) {
+        shownIdx = idx;
+        progress = 0; // every new slide gets its full time on screen
+        paintProgress();
+      }
+      if (slide !== stageSlide) swapStage(slide, instant);
     };
 
     const slideCenterOffset = (slide) => {
@@ -307,6 +368,17 @@
       }
     };
 
+    // Autoplay's step: same as the Next button, but a 2-slide carousel (which can't loop) returns to the start.
+    const advance = () => {
+      if (canLoop) {
+        stepDirection(1);
+        return;
+      }
+      const visual = getVisualSlides();
+      const pos = visual.indexOf(pendingTarget || findNearestSlide());
+      if (pos !== -1) scrollToSlide(visual[(pos + 1) % visual.length], true);
+    };
+
     const onSettle = (announce = true) => {
       if (pendingTarget && Math.abs(track.scrollLeft - (pendingOriginScroll ?? -9999)) < 1) {
         return;
@@ -323,7 +395,8 @@
       queuedDirection = null;
       applyParking(idx, replayDir === null);
 
-      if (announce && settledSlide && settledSlide !== current && statusEl) {
+      // Silent while autoplay is turning the slides (it would talk over a screen reader); spoken for anything the user does.
+      if (announce && settledSlide && settledSlide !== current && statusEl && !autoplayRunning()) {
         const person = current.getAttribute('data-person') || '';
         statusEl.textContent = `Slide ${idx + 1} of ${slides.length}: ${person}`;
       }
@@ -400,6 +473,87 @@
       }
     }
 
+    // Autoplay: one clock, driven by animation frames, that only counts while nothing is holding it.
+    function autoplayRunning() {
+      return autoplayOn && holds.size === 0;
+    }
+
+    const tickAutoplay = (now) => {
+      frameId = 0;
+      if (!autoplayRunning()) {
+        lastFrame = 0;
+        return;
+      }
+      const busy = pendingTarget || now - lastScrollAt < 250; // a slide is already travelling (or being dragged)
+      const dt = lastFrame ? Math.min(now - lastFrame, 100) : 0; // a long gap (tab asleep) must not skip ahead
+      lastFrame = now;
+      if (!busy) progress += dt / AUTOPLAY_MS;
+      if (progress >= 1) {
+        progress = 0;
+        paintProgress();
+        advance();
+      } else {
+        paintProgress();
+      }
+      frameId = requestAnimationFrame(tickAutoplay);
+    };
+
+    const startAutoplay = () => {
+      if (!frameId && autoplayRunning()) {
+        lastFrame = 0;
+        frameId = requestAnimationFrame(tickAutoplay);
+      }
+    };
+
+    const setHold = (reason, on) => {
+      if (on) holds.add(reason);
+      else holds.delete(reason);
+      if (!on) startAutoplay();
+    };
+
+    const renderToggle = () => {
+      carousel.classList.toggle('is-autoplaying', autoplayOn);
+      toggleBtn?.setAttribute('aria-label', autoplayOn ? 'Pause automatic rotation' : 'Play automatic rotation');
+    };
+
+    track.addEventListener('scroll', () => { lastScrollAt = performance.now(); }, { passive: true });
+
+    // Mouse and pen hover over the stage or the strip hold the clock; keyboard focus does too (a mouse click doesn't).
+    [stageEl, carousel].forEach((area) => {
+      if (!area) return;
+      area.addEventListener('pointerenter', (ev) => { if (ev.pointerType !== 'touch') setHold('hover', true); });
+      area.addEventListener('pointerleave', (ev) => { if (ev.pointerType !== 'touch') setHold('hover', false); });
+      area.addEventListener('focusin', () => setHold('focus', !!area.querySelector(':focus-visible')));
+      area.addEventListener('focusout', () => setHold('focus', false));
+    });
+    carousel.addEventListener('pointerdown', (ev) => { if (ev.pointerType === 'touch') setHold('touch', true); });
+    ['pointerup', 'pointercancel'].forEach((type) => {
+      carousel.addEventListener(type, () => setHold('touch', false));
+    });
+
+    document.addEventListener('visibilitychange', () => setHold('hidden', document.hidden));
+    setHold('hidden', document.hidden);
+    if ('IntersectionObserver' in window) {
+      holds.add('offscreen'); // start counting once the hero is actually on screen
+      new IntersectionObserver(([entry]) => setHold('offscreen', !entry.isIntersecting), { threshold: 0.2 }).observe(hero);
+    }
+
+    toggleBtn?.addEventListener('click', () => {
+      autoplayOn = !autoplayOn;
+      renderToggle();
+      startAutoplay();
+    });
+    if (toggleBtn) toggleBtn.hidden = false;
+
+    const onMotionPreference = () => {
+      if (prefersReducedMotion.matches && autoplayOn) {
+        autoplayOn = false;
+        renderToggle();
+      }
+    };
+    if (prefersReducedMotion.addEventListener) prefersReducedMotion.addEventListener('change', onMotionPreference);
+    renderToggle();
+
     // Initial silent center & park on load (leaving polite status region empty)
     const initIdx = Math.min(slides.length - 1, Math.max(0, Number(carousel.getAttribute('data-initial-index') || 0)));
     const initSlide = slides[initIdx] || slides[0];
@@ -412,7 +566,8 @@
     track.style.scrollSnapType = '';
     settledSlide = initSlide;
     liveSlide = initSlide;
-    syncStageFromSlide(initSlide);
+    syncStageFromSlide(initSlide, true);
+    startAutoplay();
   };
 
   // 4. Verticals Tabbed Showcase (tabs guide: focusgroup="tablist nomemory" + hidden="until-found")

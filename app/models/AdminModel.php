@@ -26,6 +26,7 @@ final class AdminModel
             'pending_reviews'      => (int) $pdo->query("SELECT COUNT(*) FROM reviews WHERE status = 'pending'")->fetchColumn(),
             'unverified_providers' => (int) $pdo->query("SELECT COUNT(*) FROM providers WHERE status = 'active' AND is_verified = 0")->fetchColumn(),
             'unconfirmed_emails'   => (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role <> 'admin' AND email_verified_at IS NULL AND suspended_at IS NULL")->fetchColumn(),
+            'open_messages'        => (int) $pdo->query("SELECT COUNT(*) FROM support_messages WHERE status = 'open'")->fetchColumn(),
         ];
     }
 
@@ -61,7 +62,7 @@ final class AdminModel
     // ---------------------------------------------------------------------------------------
 
     /**
-     * @param array $f q (text), status (active|paused|suspended), verified ('1'|'0'), featured ('1')
+     * @param array $f q (text), status (active|paused|suspended), verified ('1'|'0'), featured ('1'), portfolio ('thin')
      */
     public static function providerList(array $f, int $limit, int $offset): array
     {
@@ -151,6 +152,11 @@ final class AdminModel
 
         if ((string) ($f['featured'] ?? '') === '1') {
             $where[] = 'p.is_featured = 1';
+        }
+
+        // Thin listings (fewer than 3 photos of work) are where fake or low-effort profiles hide.
+        if ((string) ($f['portfolio'] ?? '') === 'thin') {
+            $where[] = '(SELECT COUNT(*) FROM portfolio_items pt WHERE pt.provider_id = p.id) < 3';
         }
 
         return implode(' AND ', $where);

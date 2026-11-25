@@ -224,7 +224,7 @@ $timelines = [
 
                     <fieldset class="form-fieldset" style="padding:0.95rem;">
                         <legend>Matched recipients (1–5) *</legend>
-                        <div style="display:grid; gap:0.5rem;">
+                        <div style="display:grid; grid-template-columns:minmax(0, 1fr); gap:0.5rem;">
                             <?php foreach (array_slice($matches, 0, 5) as $idx => $m): ?>
                                 <label class="match-select-row">
                                     <input
@@ -276,7 +276,7 @@ $timelines = [
                         </div>
 
                         <div class="field">
-                            <label for="b-email">Email Address *</label>
+                            <label for="b-email">Email (Optional)</label>
                             <input
                                 type="email"
                                 id="b-email"
@@ -287,9 +287,8 @@ $timelines = [
                                 autocapitalize="none"
                                 spellcheck="false"
                                 data-error="b-email-err"
-                                required
                             >
-                            <div id="b-email-err" class="error-msg">Enter a valid email address.</div>
+                            <div id="b-email-err" class="error-msg">That email address does not look right. Fix it, or leave it blank.</div>
                         </div>
                     </div>
 
@@ -334,6 +333,8 @@ $timelines = [
                         ><?= e(old('project_details')) ?></textarea>
                         <div id="b-details-err" class="error-msg">Please describe your project (at least 8 characters).</div>
                     </div>
+
+                    <p class="hint form-privacy">Your details go to the providers you selected so they can reply. See our <a href="<?= e(route_url('/privacy')) ?>">Privacy Policy</a>.</p>
 
                     <button type="submit" class="btn btn-primary btn-lg btn-block">
                         <?= svg_icon('mail', 20) ?> Dispatch Brief to Selected Talent

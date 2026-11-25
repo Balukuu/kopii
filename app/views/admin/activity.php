@@ -2,7 +2,7 @@
 defined('KOPII_APP') or exit('Direct access denied.');
 /**
  * @var array  $entries admin_log rows
- * @var string $type    '' | provider | product | opportunity | review | user
+ * @var string $type    '' | provider | product | opportunity | review | user | category | message
  * @var int    $page
  * @var int    $pages
  * @var int    $total
@@ -16,6 +16,8 @@ $tabs = [
     'opportunity' => 'Opportunities',
     'review'   => 'Reviews',
     'user'     => 'Accounts',
+    'category' => 'Categories',
+    'message'  => 'Inbox',
 ];
 ?>
 <section class="section-pad-sm">

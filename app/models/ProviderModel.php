@@ -30,6 +30,8 @@ class ProviderModel
             $params[':city'] = trim((string) $filters['city']);
         }
 
+        self::addAreaFilter($filters, $where, $params);
+
         if (!empty($filters['type']) && in_array($filters['type'], ['freelancer', 'business'], true)) {
             $where[] = 'p.provider_type = :ptype';
             $params[':ptype'] = $filters['type'];
@@ -123,6 +125,7 @@ class ProviderModel
             $where[] = 'LOWER(p.city) = LOWER(:city)';
             $params[':city'] = trim((string) $filters['city']);
         }
+        self::addAreaFilter($filters, $where, $params);
         if (!empty($filters['type']) && in_array($filters['type'], ['freelancer', 'business'], true)) {
             $where[] = 'p.provider_type = :ptype';
             $params[':ptype'] = $filters['type'];
@@ -139,6 +142,21 @@ class ProviderModel
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * "Near me" in Uganda means a neighbourhood or a town, more than a whole city. An area typed by a
+     * visitor matches where the provider is based (neighbourhood or city) and the places they say they serve.
+     */
+    private static function addAreaFilter(array $filters, array &$where, array &$params): void
+    {
+        $area = trim((string) ($filters['area'] ?? ''));
+        if ($area === '') {
+            return;
+        }
+        $like    = '%' . like_escape(strtolower($area)) . '%';
+        $where[] = "(LOWER(p.neighborhood) LIKE :area1 ESCAPE '!' OR LOWER(p.service_areas) LIKE :area2 ESCAPE '!' OR LOWER(p.city) LIKE :area3 ESCAPE '!')";
+        $params[':area1'] = $params[':area2'] = $params[':area3'] = $like;
     }
 
     private static function attachPortfolioPreviews(array $providers): array
@@ -188,6 +206,7 @@ class ProviderModel
             $where[] = 'LOWER(p.city) = LOWER(:city)';
             $params[':city'] = trim((string) $filters['city']);
         }
+        self::addAreaFilter($filters, $where, $params);
 
         $sql = "
             SELECT
@@ -329,13 +348,13 @@ class ProviderModel
         $stmt = $pdo->prepare(
             'INSERT INTO providers (
                 user_id, category_id, business_name, slug, provider_type, headline, bio,
-                city, neighborhood, phone, whatsapp, public_email, website, instagram,
+                city, neighborhood, service_areas, phone, whatsapp, public_email, website, instagram,
                 starting_price_ugx, years_experience, response_time, specialties,
                 avatar_path, cover_path, is_verified, is_featured, is_available, status,
                 views_count, created_at, updated_at
             ) VALUES (
                 :uid, :cid, :bname, :slug, :ptype, :headline, :bio,
-                :city, :neighborhood, :phone, :whatsapp, :pemail, :web, :ig,
+                :city, :neighborhood, :sareas, :phone, :whatsapp, :pemail, :web, :ig,
                 :price, :exp, :resp, :spec,
                 :avatar, :cover, 0, 0, 1, :status,
                 0, :created, :updated
@@ -352,6 +371,7 @@ class ProviderModel
             ':bio'          => trim((string) $data['bio']),
             ':city'         => trim((string) ($data['city'] ?? 'Kampala')),
             ':neighborhood' => trim((string) ($data['neighborhood'] ?? '')),
+            ':sareas'       => trim((string) ($data['service_areas'] ?? '')),
             ':phone'        => trim((string) $data['phone']),
             ':whatsapp'     => trim((string) ($data['whatsapp'] ?: $data['phone'])),
             ':pemail'       => trim((string) ($data['public_email'] ?? '')),
@@ -383,6 +403,7 @@ class ProviderModel
                 bio = :bio,
                 city = :city,
                 neighborhood = :neighborhood,
+                service_areas = :sareas,
                 phone = :phone,
                 whatsapp = :whatsapp,
                 public_email = :pemail,
@@ -407,6 +428,7 @@ class ProviderModel
             ':bio'          => trim((string) $data['bio']),
             ':city'         => trim((string) $data['city']),
             ':neighborhood' => trim((string) ($data['neighborhood'] ?? '')),
+            ':sareas'       => trim((string) ($data['service_areas'] ?? '')),
             ':phone'        => trim((string) $data['phone']),
             ':whatsapp'     => trim((string) ($data['whatsapp'] ?: $data['phone'])),
             ':pemail'       => trim((string) ($data['public_email'] ?? '')),
@@ -515,6 +537,71 @@ class ProviderModel
             ':pop'   => !empty($data['is_popular']) ? 1 : 0,
         ]);
         return (int) $pdo->lastInsertId();
+    }
+
+    /** One of this provider's own packages (for editing), or null. */
+    public static function findPackage(int $packageId, int $providerId): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM service_packages WHERE id = :id AND provider_id = :pid LIMIT 1');
+        $stmt->execute([':id' => $packageId, ':pid' => $providerId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** Change a package the provider owns. False when it does not exist or belongs to someone else. */
+    public static function updatePackage(int $packageId, int $providerId, array $data): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE service_packages SET
+                name = :name, price_ugx = :price, price_unit = :unit, turnaround = :turn,
+                description = :desc, deliverables = :deliv, is_popular = :pop
+             WHERE id = :id AND provider_id = :pid'
+        );
+        $stmt->execute([
+            ':name'  => trim((string) $data['name']),
+            ':price' => max(0, (int) $data['price_ugx']),
+            ':unit'  => trim((string) ($data['price_unit'] ?? 'per session')),
+            ':turn'  => trim((string) ($data['turnaround'] ?? '')),
+            ':desc'  => trim((string) ($data['description'] ?? '')),
+            ':deliv' => trim((string) ($data['deliverables'] ?? '')),
+            ':pop'   => !empty($data['is_popular']) ? 1 : 0,
+            ':id'    => $packageId,
+            ':pid'   => $providerId,
+        ]);
+        // rowCount() is 0 on MySQL when nothing changed, so confirm the row exists instead.
+        return self::findPackage($packageId, $providerId) !== null;
+    }
+
+    /** Change a portfolio item the provider owns. Pass image_path to swap the photo; leave it out to keep the current one. */
+    public static function updatePortfolioItem(int $itemId, int $providerId, array $data): bool
+    {
+        $sql = 'UPDATE portfolio_items SET
+                    title = :title, project_tag = :tag, description = :desc, client_location = :loc, is_featured = :feat'
+            . (isset($data['image_path']) ? ', image_path = :img' : '')
+            . ' WHERE id = :id AND provider_id = :pid';
+
+        $params = [
+            ':title' => trim((string) $data['title']),
+            ':tag'   => trim((string) ($data['project_tag'] ?? '')),
+            ':desc'  => trim((string) ($data['description'] ?? '')),
+            ':loc'   => trim((string) ($data['client_location'] ?? '')),
+            ':feat'  => !empty($data['is_featured']) ? 1 : 0,
+            ':id'    => $itemId,
+            ':pid'   => $providerId,
+        ];
+        if (isset($data['image_path'])) {
+            $params[':img'] = (string) $data['image_path'];
+        }
+
+        Database::connection()->prepare($sql)->execute($params);
+        return self::findPortfolioItem($itemId, $providerId) !== null;
+    }
+
+    /** Live listings for the sitemap: slug and when they last changed. */
+    public static function sitemapRows(int $limit = 2000): array
+    {
+        return Database::connection()
+            ->query("SELECT slug, updated_at FROM providers WHERE status = 'active' ORDER BY id ASC LIMIT " . max(1, $limit))
+            ->fetchAll();
     }
 
     public static function deletePackage(int $packageId, int $providerId): bool

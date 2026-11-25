@@ -157,7 +157,7 @@ $descLines = (string) ($product['description'] ?? '');
 
                 <div class="risk-free-box">
                     <?= svg_icon('shield', 20) ?>
-                    <span><strong>Pay when you are satisfied.</strong> Kopii does not take payments yet. Agree the price, delivery and payment with the seller directly, and meet or confirm the item before you pay.</span>
+                    <span><strong>Check before you pay.</strong> Kopii takes no payment. Agree price and delivery with the seller, meet in a public place and inspect the item first, and never pay in full for something you have not seen. <a href="<?= e(route_url('/safety')) ?>">Safety tips</a></span>
                 </div>
 
                 <dl class="facts">
@@ -176,6 +176,10 @@ $descLines = (string) ($product['description'] ?? '');
                         <dd class="dd-strong"><?= e($product['response_time']) ?></dd>
                     </div>
                 </dl>
+
+                <?php if ($isPublic && !$isOwner): ?>
+                    <?php View::partial('report_box', ['targetType' => 'product', 'targetId' => (int) $product['id'], 'noun' => 'product']); ?>
+                <?php endif; ?>
             </aside>
         </div>
     </div>
@@ -211,8 +215,8 @@ $descLines = (string) ($product['description'] ?? '');
                     </div>
                 </div>
                 <div class="field">
-                    <label for="pq-email">Your email *</label>
-                    <input type="email" id="pq-email" name="client_email" value="<?= e(old('client_email', $authUser['email'] ?? '')) ?>" autocomplete="email" autocapitalize="none" spellcheck="false" required>
+                    <label for="pq-email">Email (optional)</label>
+                    <input type="email" id="pq-email" name="client_email" value="<?= e(old('client_email', $authUser['email'] ?? '')) ?>" autocomplete="email" autocapitalize="none" spellcheck="false">
                 </div>
                 <div class="field">
                     <label for="pq-loc">Deliver to (optional)</label>
@@ -222,6 +226,7 @@ $descLines = (string) ($product['description'] ?? '');
                     <label for="pq-details">Your message *</label>
                     <textarea id="pq-details" name="project_details" minlength="8" required placeholder="How many do you need? When? Any questions about the item?"><?= e(old('project_details', 'Hello, I am interested in "' . $product['name'] . '". Is it available?')) ?></textarea>
                 </div>
+                <p class="hint form-privacy">Your details go to the seller so they can reply. See our <a href="<?= e(route_url('/privacy')) ?>">Privacy Policy</a>.</p>
                 <div style="display:flex; justify-content:flex-end; gap:0.65rem;">
                     <button type="button" class="btn btn-outline" data-close-modal>Cancel</button>
                     <button type="submit" class="btn btn-primary">Send message</button>

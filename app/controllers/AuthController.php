@@ -75,6 +75,7 @@ class AuthController
             $bio          = trim((string) ($_POST['bio'] ?? ''));
             $city         = trim((string) ($_POST['city'] ?? '')) ?: 'Kampala';
             $neighborhood = trim((string) ($_POST['neighborhood'] ?? ''));
+            $serviceAreas = normalize_area_list((string) ($_POST['service_areas'] ?? ''));
             $specialties  = trim((string) ($_POST['specialties'] ?? ''));
             $whatsapp     = trim((string) ($_POST['whatsapp'] ?? ''));
             $price        = (int) preg_replace('/\D+/', '', (string) ($_POST['starting_price_ugx'] ?? '0'));
@@ -103,6 +104,9 @@ class AuthController
             if (text_length($neighborhood) > 80 || text_length($specialties) > 300) {
                 $errors[] = 'Neighborhood and specialties are too long.';
             }
+            if ($serviceAreas === null) {
+                $errors[] = 'List up to 12 other places you serve, each up to 40 characters, separated by commas.';
+            }
             if ($headline === '') {
                 $headline = $bizName . ' — Trusted Service Provider on Kopii';
             }
@@ -118,6 +122,7 @@ class AuthController
                 'bio'                => $bio,
                 'city'               => $city,
                 'neighborhood'       => $neighborhood,
+                'service_areas'      => (string) $serviceAreas,
                 'phone'              => $phone,
                 'whatsapp'           => $whatsapp !== '' ? $whatsapp : $phone,
                 'public_email'       => $email,

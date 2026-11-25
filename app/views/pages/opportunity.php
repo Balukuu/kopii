@@ -153,6 +153,10 @@ $statusNote = match (true) {
                     <?= svg_icon('shield', 20) ?>
                     <span><strong>Contact details stay private.</strong> The person who posted this sees your proposal and profile, and chooses whether to contact you.</span>
                 </div>
+
+                <?php if (!$hidden && !$isOwner): ?>
+                    <?php View::partial('report_box', ['targetType' => 'opportunity', 'targetId' => (int) $opp['id'], 'noun' => 'opportunity']); ?>
+                <?php endif; ?>
             </aside>
         </div>
     </div>

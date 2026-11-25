@@ -44,6 +44,12 @@ Options -Indexes
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
+# Compress text on the way out. A page and its CSS and JavaScript shrink to about a quarter of their size,
+# which matters most on a slow mobile connection. (Images are already compressed and are left alone.)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml application/xml application/javascript application/json image/svg+xml
+</IfModule>
+
 # Static Asset Caching on LiteSpeed / Apache
 <IfModule mod_expires.c>
     ExpiresActive On

@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS `providers` (
     `bio` TEXT NOT NULL,
     `city` VARCHAR(80) NOT NULL DEFAULT 'Kampala',
     `neighborhood` VARCHAR(120) DEFAULT NULL,
+    `service_areas` VARCHAR(255) DEFAULT NULL,
     `phone` VARCHAR(40) NOT NULL,
     `whatsapp` VARCHAR(40) NOT NULL,
     `public_email` VARCHAR(190) DEFAULT NULL,
@@ -283,6 +284,31 @@ CREATE TABLE IF NOT EXISTS `opportunity_responses` (
     KEY `idx_opportunity_responses_provider` (`provider_id`, `created_at`),
     CONSTRAINT `fk_opportunity_responses_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_opportunity_responses_provider` FOREIGN KEY (`provider_id`) REFERENCES `providers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Messages to the Kopii team: the contact form (kind = contact) and "report this listing" (kind = report).
+-- A report names what it is about (target_type + target_id) and keeps the title as it was, so the
+-- admin inbox still reads properly after the listing is deleted. user_id is set when the sender was signed in.
+CREATE TABLE IF NOT EXISTS `support_messages` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `kind` VARCHAR(10) NOT NULL DEFAULT 'contact',
+    `user_id` INT UNSIGNED DEFAULT NULL,
+    `name` VARCHAR(120) NOT NULL DEFAULT '',
+    `email` VARCHAR(190) NOT NULL DEFAULT '',
+    `subject` VARCHAR(160) NOT NULL DEFAULT '',
+    `message` TEXT NOT NULL,
+    `target_type` VARCHAR(12) DEFAULT NULL,
+    `target_id` INT UNSIGNED DEFAULT NULL,
+    `target_label` VARCHAR(190) NOT NULL DEFAULT '',
+    `status` VARCHAR(10) NOT NULL DEFAULT 'open',
+    `handled_by` INT UNSIGNED DEFAULT NULL,
+    `handled_at` DATETIME DEFAULT NULL,
+    `note` VARCHAR(500) NOT NULL DEFAULT '',
+    `created_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_support_messages_status` (`status`, `created_at`),
+    KEY `idx_support_messages_target` (`target_type`, `target_id`),
+    CONSTRAINT `fk_support_messages_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

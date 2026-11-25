@@ -73,6 +73,7 @@ class OpportunityController
             'pageTitle'       => $opp['title'] . ' — Opportunities | Kopii',
             'metaDescription' => text_excerpt((string) $opp['description'], 155),
             'currentRoute'    => '/opportunities',
+            'noindex'         => $hidden || !OpportunityModel::isOpen($opp),
             'opp'             => $opp,
             'isOpen'          => OpportunityModel::isOpen($opp),
             'isOwner'         => $isOwner,

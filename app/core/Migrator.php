@@ -13,7 +13,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
  */
 final class Migrator
 {
-    private const VERSION = 3;
+    private const VERSION = 5;
 
     public static function run(PDO $pdo): void
     {
@@ -169,6 +169,18 @@ final class Migrator
                 : 'ALTER TABLE `inquiries` ADD COLUMN `product_name` VARCHAR(160) DEFAULT NULL');
         }
 
+        // v5: the areas a provider serves (beyond their base city and neighbourhood), and everyday
+        // service categories (home repairs, solar, cleaning, agriculture). Both are no-ops the second time.
+        if (!self::hasColumn($pdo, 'providers', 'service_areas')) {
+            $pdo->exec($sqlite
+                ? 'ALTER TABLE providers ADD COLUMN service_areas TEXT DEFAULT NULL'
+                : 'ALTER TABLE `providers` ADD COLUMN `service_areas` VARCHAR(255) DEFAULT NULL');
+        }
+
+        // v4: support_messages (the contact form and "report this listing"). Like v3's tables it is
+        // `CREATE TABLE IF NOT EXISTS` in the schema file, which is executed below, so there is no
+        // separate step for it here.
+
         $schemaSql = (string) file_get_contents(
             KOPII_ROOT . '/database/' . ($sqlite ? 'schema.sqlite.sql' : 'schema.mysql.sql')
         );
@@ -186,6 +198,7 @@ final class Migrator
 
         require_once KOPII_ROOT . '/database/Seeder.php';
         Seeder::seedProductCategories($pdo);
+        Seeder::seedExtraServiceCategories($pdo);
 
         // A developer's own demo database gets sample products and opportunities so the new pages are
         // not empty. Never on a live site: it needs app_env = local, SQLite, and the seeded demo providers.

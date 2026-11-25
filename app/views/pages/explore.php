@@ -66,6 +66,15 @@ $workQuery      = array_merge($filters, ['tab' => 'work']);
                         </select>
                     </div>
                     <div class="field">
+                        <label for="f-area">Area or Neighbourhood</label>
+                        <input type="search" id="f-area" name="area" list="area-suggestions" value="<?= e($filters['area']) ?>" placeholder="e.g. Nakawa, Ntinda, Mukono" maxlength="60" autocomplete="off" spellcheck="false" enterkeyhint="search">
+                        <datalist id="area-suggestions">
+                            <?php foreach ($areaSuggestions as $areaName): ?>
+                                <option value="<?= e($areaName) ?>"></option>
+                            <?php endforeach; ?>
+                        </datalist>
+                    </div>
+                    <div class="field">
                         <label for="f-type">Provider Type</label>
                         <select id="f-type" name="type">
                             <option value="">Freelancers &amp; Businesses</option>
@@ -147,8 +156,17 @@ $workQuery      = array_merge($filters, ['tab' => 'work']);
         <?php else: ?>
             <?php if (empty($providers)): ?>
                 <div class="content-panel" style="text-align:center; padding:3rem 1.5rem;">
-                    <h2>No freelancers or businesses found for that search</h2>
-                    <p class="text-muted">Try broadening your location or budget filter, or list your own business in this category.</p>
+                    <?php
+                    // A category nobody has joined yet is an invitation, not a dead end. Only when it is the sole filter.
+                    $onlyCategory = $activeCategory !== null && $filters['q'] === '' && $filters['city'] === '' && $filters['area'] === '' && $filters['type'] === '' && (int) $filters['max_price'] === 0 && empty($filters['verified']);
+                    ?>
+                    <?php if ($onlyCategory): ?>
+                        <h2>Nobody is listed in <?= e($activeCategory['name']) ?> yet</h2>
+                        <p class="text-muted">Do this kind of work? List your business free and be the first customers find. Need it done now? <a href="<?= e(route_url('/opportunities/new')) ?>">Post what you need</a> and providers will send you proposals.</p>
+                    <?php else: ?>
+                        <h2>No freelancers or businesses found for that search</h2>
+                        <p class="text-muted">Try a nearby area or a wider budget, or list your own business in this category.</p>
+                    <?php endif; ?>
                     <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap; margin-block-start:1rem;">
                         <a href="<?= e(route_url('/explore')) ?>" class="btn btn-outline">Clear All Filters</a>
                         <a href="<?= e(route_url('/register')) ?>" class="btn btn-primary">List Your Business Here</a>

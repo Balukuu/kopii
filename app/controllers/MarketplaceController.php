@@ -35,7 +35,7 @@ class MarketplaceController
 
         View::render('pages/home', [
             'pageTitle'         => 'Kopii — Hire Photographers, Creatives & Businesses in Uganda',
-            'metaDescription'   => 'Browse Uganda\'s photographers, designers, tailors, caterers, and studios. Review real portfolios, compare transparent UGX packages, and hire directly. Look for the Verified badge.',
+            'metaDescription'   => 'Find a real, verified provider in Uganda for the work you need: repairs, solar, cleaning, events, design, photography and more. See their past work and UGX prices, then talk on WhatsApp.',
             'currentRoute'      => '/',
             'cities'            => $uganda['cities'],
             'categories'        => $categories,
@@ -104,8 +104,9 @@ class MarketplaceController
         if (text_length($clean['name']) < 2 || text_length($clean['name']) > 100) {
             $problems[] = 'your name';
         }
-        if (!filter_var($clean['email'], FILTER_VALIDATE_EMAIL) || strlen($clean['email']) > 190) {
-            $problems[] = 'a valid email address';
+        // Optional: most people here reach each other by phone or WhatsApp. If one is given it must be real.
+        if ($clean['email'] !== '' && (!filter_var($clean['email'], FILTER_VALIDATE_EMAIL) || strlen($clean['email']) > 190)) {
+            $problems[] = 'a valid email address, or leave it blank';
         }
         $digits = phone_digit_count($clean['phone']);
         if ($digits < 9 || $digits > 15) {
@@ -217,6 +218,7 @@ class MarketplaceController
             'q'         => trim((string) ($_GET['q'] ?? '')),
             'category'  => trim((string) ($_GET['category'] ?? '')),
             'city'      => trim((string) ($_GET['city'] ?? '')),
+            'area'      => function_exists('mb_substr') ? mb_substr(trim((string) ($_GET['area'] ?? '')), 0, 60, 'UTF-8') : substr(trim((string) ($_GET['area'] ?? '')), 0, 60),
             'type'      => trim((string) ($_GET['type'] ?? '')),
             'max_price' => (int) ($_GET['max_price'] ?? 0),
             'verified'  => !empty($_GET['verified']) ? 1 : 0,
@@ -236,6 +238,8 @@ class MarketplaceController
             $heading = 'Comparing Your Shortlisted Providers (' . count($providers) . ')';
         } elseif ($activeCategory) {
             $heading = $activeCategory['name'] . ($filters['city'] !== '' ? ' in ' . $filters['city'] : ' in Uganda');
+        } elseif ($filters['area'] !== '') {
+            $heading = 'Providers near ' . $filters['area'] . ($filters['city'] !== '' ? ', ' . $filters['city'] : '');
         } elseif ($filters['city'] !== '') {
             $heading = 'Businesses & Freelancers in ' . $filters['city'];
         }
@@ -249,6 +253,7 @@ class MarketplaceController
             'filters'        => $filters,
             'shortlistMode'  => !empty($shortlistIds),
             'cities'         => $uganda['cities'],
+            'areaSuggestions' => $uganda['kampala_areas'],
             'categories'     => $categories,
             'providers'      => $providers,
             'totalProviders' => $totalProviders,
@@ -276,6 +281,8 @@ class MarketplaceController
         View::render('pages/provider', [
             'pageTitle'       => $provider['business_name'] . ' (' . $provider['city'] . ') — ' . $provider['category_name'] . ' | Kopii',
             'metaDescription' => $provider['headline'],
+            'ogImage'         => share_image_path($provider['cover_path'] ?: ($provider['avatar_path'] ?: ($provider['portfolio'][0]['image_path'] ?? null))),
+            'noindex'         => $provider['status'] !== 'active',
             'currentRoute'    => '/provider',
             'provider'        => $provider,
             'related'         => array_slice($related, 0, 3),

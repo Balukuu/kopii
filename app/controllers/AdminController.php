@@ -2,8 +2,9 @@
 defined('KOPII_APP') or exit('Direct access denied.');
 
 /**
- * The admin console: an overview of what needs a decision, listings (with the Verified check),
- * shop products, opportunities, reviews, accounts, and the log of everything an administrator has done.
+ * The admin console: an overview of what needs a decision (and whether the site is ready to go live),
+ * listings (with the Verified check), shop products, opportunities, reviews, accounts, categories,
+ * the inbox of messages and reports, and the log of everything an administrator has done.
  *
  * Every action sets an explicit state (never "flip whatever it is now"), is recorded in the
  * audit log, and returns to the page it was started from.
@@ -30,7 +31,33 @@ class AdminController
             'stats'        => ProviderModel::marketplaceStats(),
             'hidden'       => AdminModel::hiddenListings(),
             'recent'       => AdminLogModel::recent(6),
+            'health'       => SiteHealth::checks(),
         ]);
+    }
+
+    /** Send a test email to the signed-in administrator, to prove outgoing mail works on this server. */
+    public function testEmail(): void
+    {
+        $admin = require_admin();
+        verify_csrf();
+
+        if (RateLimiter::tooMany('test_email', (string) (int) $admin['id'], 5, 3600)) {
+            flash('error', 'You have sent several test emails in the last hour. Check your inbox and spam folder, or try again later.');
+            admin_redirect_back('/admin');
+        }
+        RateLimiter::hit('test_email', (string) (int) $admin['id']);
+
+        $to = (string) $admin['email'];
+        if (Notifier::testEmail($to)) {
+            $message = 'A test email was handed to the mail system for ' . $to . '. If it is not in your inbox in a few minutes, check spam: that means SPF/DKIM still need setting up.';
+            if (app_is_local()) {
+                $message = 'Local mode: the test email was written to storage/mail.log, not sent.';
+            }
+            flash('success', $message);
+        } else {
+            flash('error', 'The mail system refused the test email. Check the mail settings in app/config/env.php and the server\'s error log.');
+        }
+        admin_redirect_back('/admin');
     }
 
     // ---------------------------------------------------------------------------------------
@@ -46,6 +73,7 @@ class AdminController
             'status'   => $this->choice('status', AdminModel::PROVIDER_STATUSES),
             'verified' => $this->choice('verified', ['1', '0']),
             'featured' => $this->choice('featured', ['1']),
+            'portfolio' => $this->choice('portfolio', ['thin']),
         ];
 
         [$page, $pages, $total] = $this->paginate(AdminModel::providerCount($filters));
@@ -506,6 +534,210 @@ class AdminController
         }
 
         admin_redirect_back('/admin/users');
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Categories
+    // ---------------------------------------------------------------------------------------
+
+    public function categories(): void
+    {
+        require_admin();
+
+        $kind = $this->choice('kind', CategoryModel::KINDS);
+        $kind = $kind !== '' ? $kind : 'service';
+
+        View::render('admin/categories', [
+            'pageTitle'    => 'Categories — Admin — Kopii',
+            'currentRoute' => '/admin/categories',
+            'adminTab'     => 'categories',
+            'kind'         => $kind,
+            'rows'         => CategoryModel::adminList($kind),
+            'icons'        => CategoryModel::ICONS,
+            'editing'      => ctype_digit((string) ($_GET['edit'] ?? '')) ? CategoryModel::adminFind($kind, (int) $_GET['edit']) : null,
+        ]);
+    }
+
+    /** Add a category (no category_id) or change one. The slug is fixed when the category is made. */
+    public function saveCategory(): void
+    {
+        require_admin();
+        verify_csrf();
+
+        $kind = in_array($_POST['kind'] ?? '', CategoryModel::KINDS, true) ? (string) $_POST['kind'] : 'service';
+        $id   = (int) ($_POST['category_id'] ?? 0);
+        $back = '/admin/categories?kind=' . $kind;
+
+        $existing = $id > 0 ? CategoryModel::adminFind($kind, $id) : null;
+        if ($id > 0 && $existing === null) {
+            flash('error', 'That category no longer exists.');
+            admin_redirect_back($back);
+        }
+
+        $name        = trim((string) ($_POST['name'] ?? ''));
+        $icon        = (string) ($_POST['icon'] ?? '');
+        $description = trim((string) ($_POST['description'] ?? ''));
+        $sort        = max(0, min(999, (int) ($_POST['sort_order'] ?? 0)));
+
+        $problems = [];
+        if (text_length($name) < 2 || text_length($name) > 60) {
+            $problems[] = 'Enter a name of 2 to 60 characters.';
+        } elseif (CategoryModel::adminNameTaken($kind, $name, $id)) {
+            $problems[] = 'Another category already has that name.';
+        }
+        if (!in_array($icon, CategoryModel::ICONS, true)) {
+            $problems[] = 'Choose an icon from the list.';
+        }
+        if ($kind === 'service' && text_length($description) > 255) {
+            $problems[] = 'Keep the description to 255 characters or fewer.';
+        }
+        if (!empty($problems)) {
+            flash('error', 'Nothing was saved. ' . implode(' ', $problems));
+            admin_redirect_back($id > 0 ? $back . '&edit=' . $id : $back);
+        }
+
+        $data = ['name' => $name, 'icon' => $icon, 'sort_order' => $sort, 'description' => $description];
+        try {
+            if ($existing === null) {
+                $newId = CategoryModel::adminCreate($kind, $data);
+                AdminLogModel::record('category.create', 'category', $newId, $name, $kind . ' category');
+                flash('success', 'The category "' . $name . '" was added.');
+            } else {
+                CategoryModel::adminUpdate($kind, $id, $data);
+                AdminLogModel::record('category.update', 'category', $id, $name, $kind . ' category');
+                flash('success', 'The category "' . $name . '" was saved.');
+            }
+        } catch (Throwable $e) {
+            flash('error', report_exception($e, 'We could not save that category. Please try again.'));
+        }
+
+        admin_redirect_back($back);
+    }
+
+    /** Delete a category nobody uses. One that is in use must be left alone (rename it instead). */
+    public function deleteCategory(): void
+    {
+        require_admin();
+        verify_csrf();
+
+        $kind = in_array($_POST['kind'] ?? '', CategoryModel::KINDS, true) ? (string) $_POST['kind'] : 'service';
+        $id   = (int) ($_POST['category_id'] ?? 0);
+        $back = '/admin/categories?kind=' . $kind;
+
+        $category = $id > 0 ? CategoryModel::adminFind($kind, $id) : null;
+        if ($category === null) {
+            flash('error', 'That category no longer exists.');
+            admin_redirect_back($back);
+        }
+
+        $inUse = 0;
+        foreach (CategoryModel::adminList($kind) as $row) {
+            if ((int) $row['id'] === $id) {
+                $inUse = (int) $row['uses'];
+            }
+        }
+        if ($inUse > 0) {
+            flash('error', '"' . $category['name'] . '" is used by ' . $inUse . ($kind === 'product' ? ' product' : ' listing') . ($inUse === 1 ? '' : 's') . ', so it cannot be deleted. Rename it instead, or wait until they have moved.');
+            admin_redirect_back($back);
+        }
+
+        try {
+            CategoryModel::adminDelete($kind, $id);
+            AdminLogModel::record('category.delete', 'category', $id, (string) $category['name'], $kind . ' category');
+            flash('success', 'The category "' . $category['name'] . '" was deleted.');
+        } catch (Throwable $e) {
+            flash('error', report_exception($e, 'We could not delete that category. Please try again.'));
+        }
+        admin_redirect_back($back);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Inbox: contact messages and reported listings
+    // ---------------------------------------------------------------------------------------
+
+    public function inbox(): void
+    {
+        require_admin();
+
+        $open   = SupportModel::openCount();
+        $status = $this->choice('status', ['open', 'handled', 'all']);
+        if ($status === '') {
+            // Open on what is waiting when there is something: that is what the admin came to do.
+            $status = $open > 0 ? 'open' : 'all';
+        }
+        $filters = [
+            'kind'   => $this->choice('kind', SupportModel::KINDS),
+            'status' => $status === 'all' ? '' : $status,
+            'q'      => $this->text('q'),
+        ];
+
+        [$page, $pages, $total] = $this->paginate(SupportModel::count($filters));
+        $messages = SupportModel::search($filters, self::PER_PAGE, ($page - 1) * self::PER_PAGE);
+
+        // What each report is about, with the page to look at and the admin page to act on. Null when it
+        // is gone: the listing may have been deleted since.
+        foreach ($messages as &$m) {
+            $m['target'] = !empty($m['target_type']) ? SupportModel::resolveTarget((string) $m['target_type'], (int) $m['target_id']) : null;
+        }
+        unset($m);
+
+        View::render('admin/inbox', [
+            'pageTitle'    => 'Inbox — Admin — Kopii',
+            'currentRoute' => '/admin/inbox',
+            'adminTab'     => 'inbox',
+            'messages'     => $messages,
+            'status'       => $status,
+            'kind'         => $filters['kind'],
+            'q'            => $filters['q'],
+            'counts'       => [
+                'open'    => $open,
+                'handled' => SupportModel::count(['status' => 'handled']),
+                'all'     => SupportModel::count([]),
+            ],
+            'page'         => $page,
+            'pages'        => $pages,
+            'total'        => $total,
+        ]);
+    }
+
+    public function inboxAction(): void
+    {
+        $admin = require_admin();
+        verify_csrf();
+
+        $id      = (int) ($_POST['message_id'] ?? 0);
+        $action  = (string) ($_POST['inbox_action'] ?? '');
+        $message = $id > 0 ? SupportModel::find($id) : null;
+
+        if ($message === null) {
+            flash('error', 'That message no longer exists.');
+            admin_redirect_back('/admin/inbox');
+        }
+
+        $note  = $this->note('/admin/inbox');
+        $label = ((string) $message['kind'] === SupportModel::REPORT ? 'report on ' . $message['target_label'] : 'message from ' . ($message['name'] !== '' ? $message['name'] : 'a visitor'));
+
+        if ($action === 'handle') {
+            if ($message['status'] === SupportModel::HANDLED) {
+                flash('success', 'That one was already marked as dealt with.');
+            } else {
+                SupportModel::setStatus($id, SupportModel::HANDLED, (int) $admin['id'], $note);
+                AdminLogModel::record('message.handle', 'message', $id, $label, $note);
+                flash('success', 'Marked as dealt with.');
+            }
+        } elseif ($action === 'reopen') {
+            if ($message['status'] === SupportModel::OPEN) {
+                flash('success', 'That one is already open.');
+            } else {
+                SupportModel::setStatus($id, SupportModel::OPEN, (int) $admin['id']);
+                AdminLogModel::record('message.reopen', 'message', $id, $label);
+                flash('success', 'Reopened.');
+            }
+        } else {
+            flash('error', 'That action is not recognised.');
+        }
+
+        admin_redirect_back('/admin/inbox');
     }
 
     // ---------------------------------------------------------------------------------------

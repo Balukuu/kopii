@@ -196,6 +196,12 @@ $selectedType = old('provider_type', 'freelancer');
                             </div>
                         </div>
 
+                        <div class="field">
+                            <label for="reg-serves">Other places you serve (Optional)</label>
+                            <input type="text" id="reg-serves" name="service_areas" value="<?= e(old('service_areas')) ?>" maxlength="200" placeholder="e.g. Wakiso, Mukono, Entebbe Road">
+                            <span class="hint">Customers often want someone close by. Separate places with commas.</span>
+                        </div>
+
                         <div class="form-row-2">
                             <div class="field">
                                 <label for="reg-price">Starting Rate in UGX (Optional)</label>
@@ -237,6 +243,8 @@ $selectedType = old('provider_type', 'freelancer');
                     <button type="submit" class="btn btn-primary btn-lg btn-block">
                         Create my account
                     </button>
+
+                    <p class="hint form-privacy" style="text-align:center;">By creating an account you agree to the <a href="<?= e(route_url('/terms')) ?>">Terms of Use</a> and the <a href="<?= e(route_url('/privacy')) ?>">Privacy Policy</a>.</p>
 
                     <p style="text-align:center; margin:0; font-size:0.875rem; color:var(--graphite-700);">
                         Already part of the network? <a href="<?= e(route_url('/login')) ?>"><strong>Log in</strong></a>

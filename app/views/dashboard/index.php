@@ -82,6 +82,32 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
 
             <div class="profile-layout">
                 <div>
+                    <?php
+                    $verifyChecks = [
+                        'Your phone and WhatsApp numbers work'            => true,
+                        'Original work: at least 3 real photos'           => count($portfolio) >= 3,
+                        'Clear pricing: a starting rate or one package'   => (int) $provider['starting_price_ugx'] > 0 || count($packages) >= 1,
+                    ];
+                    ?>
+                    <div class="content-panel">
+                        <?php if (!empty($provider['is_verified'])): ?>
+                            <h2><?= svg_icon('verified', 20) ?> You are Verified<?= !empty($provider['verified_at']) ? ' since ' . e(date('j M Y', (int) strtotime((string) $provider['verified_at']))) : '' ?></h2>
+                            <p class="text-muted m-0">The Kopii team checked your phone, portfolio and pricing. Keep your numbers working and your portfolio up to date, because customers see the date.</p>
+                        <?php else: ?>
+                            <h2>Get Verified</h2>
+                            <p class="text-muted" style="margin-block-start:0;">The Kopii team checks listings by hand and adds the Verified badge. Verified providers rank higher and customers trust them more. This is what we look for:</p>
+                            <ul class="deliverables-list">
+                                <?php foreach ($verifyChecks as $label => $done): ?>
+                                    <li>
+                                        <?= svg_icon($done ? 'check' : 'plus', 16) ?>
+                                        <span style="<?= $done ? '' : 'color:var(--ink-2);' ?>"><?= e($label) ?></span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <p class="hint m-0">Tip: 3 to 6 clear photos of your real work beat 20 stock images.</p>
+                        <?php endif; ?>
+                    </div>
+
                     <div class="content-panel">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-block-end:1rem;">
                             <h2 class="m-0">Recent Client Inquiries</h2>
@@ -165,7 +191,7 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                                     <div style="font-size:0.86rem; color:var(--slate-600);">
                                         Received <?= e(time_ago((string) $inq['created_at'])) ?>
                                         &middot; Phone: <strong><?= e($inq['client_phone']) ?></strong>
-                                        &middot; Email: <?= e($inq['client_email']) ?>
+                                        <?php if ((string) $inq['client_email'] !== ''): ?>&middot; Email: <?= e($inq['client_email']) ?><?php endif; ?>
                                     </div>
                                 </div>
 
@@ -222,6 +248,7 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                 <div>
                     <div class="content-panel">
                         <h2>Your Published Portfolio (<?= count($portfolio) ?>)</h2>
+                        <p class="hint" style="margin-block:-0.5rem 1rem;">3 to 6 clear photos of your real work beat 20 stock images. Customers and the Kopii team both look at them.</p>
                         <?php if (empty($portfolio)): ?>
                             <p class="text-muted">Upload your best photographs, designs, or completed projects using the form so customers can see your craft!</p>
                         <?php else: ?>
@@ -239,13 +266,16 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                                             <?php if (!empty($item['description'])): ?>
                                                 <p class="text-muted" style="margin:0; font-size:0.84rem;"><?= e($item['description']) ?></p>
                                             <?php endif; ?>
-                                            <form method="POST" action="<?= e(route_url('/dashboard/portfolio/delete')) ?>" style="margin-block-start:0.5rem;">
-                                                <?= csrf_field() ?>
-                                                <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
-                                                <button type="submit" class="btn btn-danger-outline btn-sm">
-                                                    <?= svg_icon('trash', 16) ?> Remove
-                                                </button>
-                                            </form>
+                                            <div class="product-row-actions" style="margin-block-start:0.5rem;">
+                                                <a class="btn btn-outline btn-sm" href="<?= e(route_url('/dashboard', ['tab' => 'portfolio', 'edit' => (string) (int) $item['id']])) ?>">Edit</a>
+                                                <form method="POST" action="<?= e(route_url('/dashboard/portfolio/delete')) ?>" data-confirm="Yes, remove">
+                                                    <?= csrf_field() ?>
+                                                    <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
+                                                    <button type="submit" class="btn btn-danger-outline btn-sm">
+                                                        <?= svg_icon('trash', 16) ?> Remove
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </div>
                                     </article>
                                 <?php endforeach; ?>
@@ -254,37 +284,48 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                     </div>
                 </div>
 
-                <aside class="content-panel">
-                    <h2>Upload New Work Sample</h2>
-                    <form method="POST" action="<?= e(route_url('/dashboard/portfolio/add')) ?>" enctype="multipart/form-data" class="stack-form">
+                <?php $ei = $editingItem; ?>
+                <aside class="content-panel" id="work-form">
+                    <h2><?= $ei !== null ? 'Edit work sample' : 'Upload New Work Sample' ?></h2>
+                    <form method="POST" action="<?= e(route_url($ei !== null ? '/dashboard/portfolio/update' : '/dashboard/portfolio/add')) ?>" enctype="multipart/form-data" class="stack-form">
                         <?= csrf_field() ?>
+                        <?php if ($ei !== null): ?>
+                            <input type="hidden" name="item_id" value="<?= (int) $ei['id'] ?>">
+                            <div class="field">
+                                <span class="label-strong" style="font-weight:600;">Current photo</span>
+                                <img src="<?= e(thumb_url($ei['image_path'])) ?>" alt="<?= e($ei['title']) ?>" width="320" height="240" style="max-inline-size:100%; block-size:auto; border-radius:var(--radius-md);">
+                            </div>
+                        <?php endif; ?>
                         <div class="field">
-                            <label for="p-img">Work Photograph (JPG, PNG, WebP up to 6 MB) *</label>
-                            <input type="file" id="p-img" name="portfolio_image" accept="image/jpeg,image/png,image/webp" required>
+                            <label for="p-img"><?= $ei !== null ? 'Replace the photo (optional, JPG, PNG, WebP up to 6 MB)' : 'Work Photograph (JPG, PNG, WebP up to 6 MB) *' ?></label>
+                            <input type="file" id="p-img" name="portfolio_image" accept="image/jpeg,image/png,image/webp"<?= $ei === null ? ' required' : '' ?>>
                         </div>
                         <div class="field">
                             <label for="p-title">Project / Shoot Title *</label>
-                            <input type="text" id="p-title" name="title" placeholder="e.g. Lakeside Sunset Wedding" required>
+                            <input type="text" id="p-title" name="title" value="<?= e($ei['title'] ?? '') ?>" maxlength="120" placeholder="e.g. Lakeside Sunset Wedding" required>
                         </div>
                         <div class="field">
                             <label for="p-tag">Category Tag (Optional)</label>
-                            <input type="text" id="p-tag" name="project_tag" placeholder="e.g. Wedding, Portrait, Product">
+                            <input type="text" id="p-tag" name="project_tag" value="<?= e($ei['project_tag'] ?? '') ?>" maxlength="60" placeholder="e.g. Wedding, Portrait, Product">
                         </div>
                         <div class="field">
                             <label for="p-loc">Location in Uganda (Optional)</label>
-                            <input type="text" id="p-loc" name="client_location" placeholder="e.g. Entebbe, Kololo">
+                            <input type="text" id="p-loc" name="client_location" value="<?= e($ei['client_location'] ?? '') ?>" maxlength="120" placeholder="e.g. Entebbe, Kololo">
                         </div>
                         <div class="field">
                             <label for="p-desc">Short Story / Details (Optional)</label>
-                            <textarea id="p-desc" name="description" placeholder="Lighting, brief, or what you delivered for this client..."></textarea>
+                            <textarea id="p-desc" name="description" maxlength="1000" placeholder="Lighting, brief, or what you delivered for this client..."><?= e($ei['description'] ?? '') ?></textarea>
                         </div>
                         <div class="checkbox-row">
-                            <input type="checkbox" id="p-feat" name="is_featured" value="1" checked>
+                            <input type="checkbox" id="p-feat" name="is_featured" value="1"<?= $ei === null || !empty($ei['is_featured']) ? ' checked' : '' ?>>
                             <label for="p-feat">Pin to top 3 card preview strip</label>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">
-                            <?= svg_icon('plus', 16) ?> Publish to Portfolio
+                            <?php if ($ei !== null): ?>Save changes<?php else: ?><?= svg_icon('plus', 16) ?> Publish to Portfolio<?php endif; ?>
                         </button>
+                        <?php if ($ei !== null): ?>
+                            <a class="btn btn-outline btn-block" href="<?= e(route_url('/dashboard', ['tab' => 'portfolio'])) ?>">Cancel</a>
+                        <?php endif; ?>
                     </form>
                 </aside>
             </div>
@@ -294,6 +335,7 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                 <div>
                     <div class="content-panel">
                         <h2>Service Packages &amp; UGX Pricing (<?= count($packages) ?>)</h2>
+                        <p class="hint" style="margin-block:-0.5rem 1rem;">Simple packages are easier to compare than hourly rates, for example "Basic clean, UGX 50,000" or "Full-day event setup, UGX 350,000".</p>
                         <?php if (empty($packages)): ?>
                             <p class="text-muted">Adding clear UGX packages helps customers compare options and send higher-intent booking requests.</p>
                         <?php else: ?>
@@ -311,13 +353,16 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                                                 <p class="text-muted" style="margin:0.5rem 0 0; font-size:0.88rem;"><?= e($pkg['description']) ?></p>
                                             <?php endif; ?>
                                         </div>
-                                        <form method="POST" action="<?= e(route_url('/dashboard/packages/delete')) ?>">
-                                            <?= csrf_field() ?>
-                                            <input type="hidden" name="package_id" value="<?= (int) $pkg['id'] ?>">
-                                            <button type="submit" class="btn btn-danger-outline btn-sm">
-                                                <?= svg_icon('trash', 16) ?> Delete Package
-                                            </button>
-                                        </form>
+                                        <div class="product-row-actions">
+                                            <a class="btn btn-outline btn-sm" href="<?= e(route_url('/dashboard', ['tab' => 'packages', 'edit' => (string) (int) $pkg['id']])) ?>">Edit</a>
+                                            <form method="POST" action="<?= e(route_url('/dashboard/packages/delete')) ?>" data-confirm="Yes, delete">
+                                                <?= csrf_field() ?>
+                                                <input type="hidden" name="package_id" value="<?= (int) $pkg['id'] ?>">
+                                                <button type="submit" class="btn btn-danger-outline btn-sm">
+                                                    <?= svg_icon('trash', 16) ?> Delete
+                                                </button>
+                                            </form>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -325,45 +370,52 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                     </div>
                 </div>
 
-                <aside class="content-panel">
-                    <h2>Add Service Package</h2>
-                    <form method="POST" action="<?= e(route_url('/dashboard/packages/add')) ?>" class="stack-form">
+                <?php $ep = $editingPackage; ?>
+                <aside class="content-panel" id="package-form">
+                    <h2><?= $ep !== null ? 'Edit package' : 'Add Service Package' ?></h2>
+                    <form method="POST" action="<?= e(route_url($ep !== null ? '/dashboard/packages/update' : '/dashboard/packages/add')) ?>" class="stack-form">
                         <?= csrf_field() ?>
+                        <?php if ($ep !== null): ?>
+                            <input type="hidden" name="package_id" value="<?= (int) $ep['id'] ?>">
+                        <?php endif; ?>
                         <div class="field">
                             <label for="pkg-name">Package Name *</label>
-                            <input type="text" id="pkg-name" name="name" placeholder="e.g. Half-Day Event Coverage" required>
+                            <input type="text" id="pkg-name" name="name" value="<?= e($ep['name'] ?? '') ?>" maxlength="100" placeholder="e.g. Half-Day Event Coverage" required>
                         </div>
                         <div class="form-row-2">
                             <div class="field">
                                 <label for="pkg-price">Price (UGX) *</label>
-                                <input type="text" inputmode="numeric" id="pkg-price" name="price_ugx" placeholder="e.g. 650000" required>
+                                <input type="text" inputmode="numeric" id="pkg-price" name="price_ugx" value="<?= $ep !== null ? (int) $ep['price_ugx'] : '' ?>" placeholder="e.g. 650000" required>
                             </div>
                             <div class="field">
                                 <label for="pkg-unit">Pricing Unit</label>
                                 <select id="pkg-unit" name="price_unit">
                                     <?php foreach ($priceUnits as $u): ?>
-                                        <option value="<?= e($u) ?>"><?= e($u) ?></option>
+                                        <option value="<?= e($u) ?>"<?= ($ep['price_unit'] ?? '') === $u ? ' selected' : '' ?>><?= e($u) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>
                         <div class="field">
                             <label for="pkg-turn">Delivery Turnaround</label>
-                            <input type="text" id="pkg-turn" name="turnaround" placeholder="e.g. 5 business days">
+                            <input type="text" id="pkg-turn" name="turnaround" value="<?= e($ep['turnaround'] ?? '') ?>" maxlength="80" placeholder="e.g. 5 business days">
                         </div>
                         <div class="field">
                             <label for="pkg-desc">Short Summary</label>
-                            <input type="text" id="pkg-desc" name="description" placeholder="Who is this package best for?">
+                            <input type="text" id="pkg-desc" name="description" value="<?= e($ep['description'] ?? '') ?>" maxlength="500" placeholder="Who is this package best for?">
                         </div>
                         <div class="field">
                             <label for="pkg-deliv">Deliverables (One item per line)</label>
-                            <textarea id="pkg-deliv" name="deliverables" placeholder="Up to 4 hours coverage&#10;120 retouched high-res photos&#10;Online gallery link"></textarea>
+                            <textarea id="pkg-deliv" name="deliverables" maxlength="1000" placeholder="Up to 4 hours coverage&#10;120 retouched high-res photos&#10;Online gallery link"><?= e($ep['deliverables'] ?? '') ?></textarea>
                         </div>
                         <div class="checkbox-row">
-                            <input type="checkbox" id="pkg-pop" name="is_popular" value="1">
+                            <input type="checkbox" id="pkg-pop" name="is_popular" value="1"<?= !empty($ep['is_popular']) ? ' checked' : '' ?>>
                             <label for="pkg-pop">Highlight as "Most Popular Choice"</label>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">Add Package</button>
+                        <button type="submit" class="btn btn-primary btn-block"><?= $ep !== null ? 'Save changes' : 'Add Package' ?></button>
+                        <?php if ($ep !== null): ?>
+                            <a class="btn btn-outline btn-block" href="<?= e(route_url('/dashboard', ['tab' => 'packages'])) ?>">Cancel</a>
+                        <?php endif; ?>
                     </form>
                 </aside>
             </div>
@@ -582,6 +634,12 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                             <label for="ed-area">Neighborhood / Street</label>
                             <input type="text" id="ed-area" name="neighborhood" value="<?= e($provider['neighborhood'] ?? '') ?>">
                         </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="ed-serves">Other places you serve</label>
+                        <input type="text" id="ed-serves" name="service_areas" value="<?= e($provider['service_areas'] ?? '') ?>" maxlength="200" placeholder="e.g. Wakiso, Mukono, Entebbe Road">
+                        <span class="hint">Shown on your page and used when customers search by area. Separate places with commas (up to 12).</span>
                     </div>
 
                     <div class="form-row-2">

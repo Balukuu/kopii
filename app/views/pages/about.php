@@ -15,7 +15,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
     <div class="container">
         <h1>A free showcase for Ugandan creatives and businesses</h1>
         <p class="hero-lead">
-            Kopii combines portfolio transparency with direct Ugandan market access — connecting couples, brands, NGOs, and corporate teams with photographers, designers, bespoke tailors, and service studios.
+            Kopii is where you find a real, verified provider for the work you need, from home repairs and solar to weddings, design and photography. We introduce you, then step aside: you talk on WhatsApp or by phone and agree the deal yourselves.
         </p>
         <div style="display:flex; flex-wrap:wrap; gap:0.85rem;">
             <a href="<?= e(route_url('/hire')) ?>" class="btn btn-on-dark btn-lg">Get matched</a>
@@ -44,8 +44,8 @@ defined('KOPII_APP') or exit('Direct access denied.');
             </div>
             <div class="value-cell">
                 <div class="value-icon"><?= svg_icon('sparkles', 24) ?></div>
-                <h3>Matching by budget and city</h3>
-                <p>Clients short on time use our Guided Hiring Wizard to score providers against their category, Ugandan city, timeline, and UGX budget in seconds.</p>
+                <h3>Close to you, within your budget</h3>
+                <p>Search by city and neighbourhood to find someone nearby. Short on time? The Guided Hiring Wizard scores providers against your category, area, timeline, and UGX budget, and sends one brief to the best few.</p>
             </div>
             <div class="value-cell">
                 <div class="value-icon"><?= svg_icon('whatsapp', 24) ?></div>

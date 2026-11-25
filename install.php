@@ -60,6 +60,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $adminName = trim((string) ($_POST['admin_name'] ?? 'Kopii Admin'));
         $adminMail = strtolower(trim((string) ($_POST['admin_email'] ?? 'admin@kopii.online')));
         $adminPass = (string) ($_POST['admin_pass'] ?? '');
+        $supportMail = strtolower(trim((string) ($_POST['support_email'] ?? '')));
         $seedDemo  = !empty($_POST['seed_demo']);
 
         $appUrlParts = parse_url($appUrl);
@@ -68,6 +69,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $error = implode(' ', $setupProblems);
         } elseif ($dbName === '' || $dbUser === '' || strlen($adminPass) < 8 || !filter_var($adminMail, FILTER_VALIDATE_EMAIL)) {
             $error = 'Please fill in your MySQL database name, username, valid admin email, and an admin password (8+ characters).';
+        } elseif ($supportMail !== '' && !filter_var($supportMail, FILTER_VALIDATE_EMAIL)) {
+            $error = 'The support email must be a valid address such as support@kopii.online, or left blank.';
         } elseif (!is_array($appUrlParts) || !in_array(strtolower((string) ($appUrlParts['scheme'] ?? '')), ['http', 'https'], true) || empty($appUrlParts['host'])) {
             $error = 'The site URL must be a full address such as https://kopii.online.';
         } else {
@@ -106,6 +109,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     'app_env'  => 'production',
                     'timezone' => 'Africa/Kampala',
                     'trusted_ip_header' => '',
+                    'support_email' => $supportMail,
                     'mail'     => [
                         'driver'          => 'mail',
                         'from_email'      => 'no-reply@' . $mailHost,
@@ -225,6 +229,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                         <div class="field">
                             <label for="admin_pass">Admin Password (8+ characters) *</label>
                             <input type="password" id="admin_pass" name="admin_pass" minlength="8" autocomplete="new-password" required>
+                        </div>
+                        <div class="field">
+                            <label for="support_email">Support Email (optional)</label>
+                            <input type="email" id="support_email" name="support_email" value="<?= htmlspecialchars($_POST['support_email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="support@kopii.online" spellcheck="false">
+                            <span class="hint">Shown on the Contact page, and where contact messages and reports are emailed. Leave blank to email the administrators instead.</span>
                         </div>
                         <div class="checkbox-row">
                             <input type="checkbox" id="seed_demo" name="seed_demo" value="1">
