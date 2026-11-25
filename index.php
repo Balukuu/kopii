@@ -67,6 +67,7 @@ error_reporting(E_ALL);
 // which also recognises HTTPS terminated by a proxy / CDN (X-Forwarded-Proto, Cloudflare).
 require_once KOPII_ROOT . '/app/core/Helpers.php';
 app_config_store($config);
+send_security_headers();
 
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([

@@ -18,6 +18,16 @@ return [
     // Leave empty if visitors connect directly. Only set it if a proxy really overwrites that header.
     'trusted_ip_header' => '',
 
+    // Browser protections sent on every page (see send_security_headers() in app/core/Helpers.php).
+    // 'csp': true enforces the Content-Security-Policy (scripts only from this site). Use 'report-only'
+    // to log would-be violations in the browser console without blocking anything, e.g. while trying a
+    // new third-party script, or false to switch it off.
+    // 'hsts_max_age': seconds browsers must insist on HTTPS for this domain (default 180 days). It is
+    // only sent on a live site reached over HTTPS. 0 turns it off. Because browsers remember it, if
+    // HTTPS ever breaks set this to 0 and wait out the old value before relying on plain HTTP.
+    'csp'          => true,
+    'hsts_max_age' => 15552000,
+
     // Address shown to providers in emails about a paused listing or suspended account, so they can
     // reply to the team. Leave '' to say "get in touch with the Kopii team" without an address.
     'support_email' => '',

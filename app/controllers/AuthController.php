@@ -56,7 +56,7 @@ class AuthController
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
             $errors[] = 'Please enter a valid email address.';
         } elseif (UserModel::findByEmail($email)) {
-            $errors[] = 'An account with this email already exists. Try signing in instead.';
+            $errors[] = 'An account with this email already exists. Sign in, or use "Forgot your password?" on the sign-in page to get back in.';
         }
         if (strlen($password) < 8) {
             $errors[] = 'Password must be at least 8 characters long.';
@@ -157,7 +157,7 @@ class AuthController
             // A second sign-up with the same address that slipped past the check above.
             $duplicate = $e instanceof PDOException && (string) $e->getCode() === '23000';
             flash('error', $duplicate
-                ? 'An account with this email already exists. Try signing in instead.'
+                ? 'An account with this email already exists. Sign in, or use "Forgot your password?" on the sign-in page to get back in.'
                 : report_exception($e, 'We could not create your account right now. Please try again in a moment.'));
             redirect_to('/register');
         }
@@ -170,13 +170,12 @@ class AuthController
             report_exception($e);
         }
 
-        session_regenerate_id(true);
-        $_SESSION['user'] = [
-            'id'        => $userId,
-            'full_name' => $fullName,
-            'email'     => $email,
-            'role'      => $accountRole,
-        ];
+        $newUser = UserModel::findById($userId);
+        if ($newUser === null) {
+            flash('success', 'Your account is ready. Please sign in.');
+            redirect_to('/login');
+        }
+        start_user_session($newUser);
 
         if ($accountRole === 'provider') {
             flash('success', 'Welcome to Kopii! Your showcase profile is live — upload your best portfolio photos and service packages below.');
@@ -234,13 +233,7 @@ class AuthController
             redirect_to('/login');
         }
 
-        session_regenerate_id(true);
-        $_SESSION['user'] = [
-            'id'        => (int) $user['id'],
-            'full_name' => (string) $user['full_name'],
-            'email'     => (string) $user['email'],
-            'role'      => (string) $user['role'],
-        ];
+        start_user_session($user);
 
         flash('success', 'Welcome back, ' . $user['full_name'] . '!');
         if ($user['role'] === 'admin') {

@@ -126,6 +126,57 @@ function request_is_https(): bool
 }
 
 /**
+ * Browser-side defences sent with every page: a Content-Security-Policy, HSTS and a
+ * Permissions-Policy. (nosniff, frame and referrer headers come from .htaccess.)
+ *
+ * The CSP is what limits the damage of an injection bug: scripts may only come from this site, so
+ * injected markup cannot run code or load code from elsewhere. Styles still allow inline `style=""`
+ * attributes (the views use them) plus the two font providers the layout loads.
+ *
+ * Optional env.php switches:
+ *   'csp'           => true (default, enforce) | 'report-only' (log violations in the browser console
+ *                      without blocking anything, handy after adding a new third-party script) | false
+ *   'hsts_max_age'  => seconds, default 15552000 (180 days); 0 turns HSTS off. Sent only on a live
+ *                      site reached over HTTPS. Browsers then refuse plain HTTP for that long, so set
+ *                      it to 0 first if HTTPS is ever misconfigured.
+ */
+function send_security_headers(): void
+{
+    if (headers_sent()) {
+        return;
+    }
+
+    $csp = app_config('csp', true);
+    if ($csp !== false) {
+        $directives = [
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline' https://use.typekit.net https://p.typekit.net https://fonts.googleapis.com",
+            "font-src 'self' https://use.typekit.net https://fonts.gstatic.com",
+            "img-src 'self' data: https://p.typekit.net",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'self'",
+        ];
+        // Only meaningful (and only safe) where the site really is served over HTTPS.
+        if (!app_is_local() && request_is_https()) {
+            $directives[] = 'upgrade-insecure-requests';
+        }
+        $name = $csp === 'report-only' ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
+        header($name . ': ' . implode('; ', $directives));
+    }
+
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+
+    $maxAge = (int) app_config('hsts_max_age', 15552000);
+    if ($maxAge > 0 && !app_is_local() && request_is_https()) {
+        header('Strict-Transport-Security: max-age=' . $maxAge);
+    }
+}
+
+/**
  * Compute base path automatically (supports both domain root and subdirectory installs).
  */
 function base_path(): string
@@ -468,6 +519,30 @@ function require_admin(): array
 }
 
 /**
+ * A short, non-reversible tag for an account's current password. The session keeps it, and every
+ * request compares it with the database: when the password changes, every session that was opened
+ * with the old one stops working. That matters when someone registers an address that is not
+ * theirs, stays signed in, and the real owner later takes the account back with a password reset.
+ */
+function password_fingerprint(string $passwordHash): string
+{
+    return substr(hash('sha256', 'kopii-session|' . $passwordHash), 0, 32);
+}
+
+/** Sign a user in: fresh session id (against session fixation) and the account details the pages need. */
+function start_user_session(array $user): void
+{
+    session_regenerate_id(true);
+    $_SESSION['user'] = [
+        'id'        => (int) $user['id'],
+        'full_name' => (string) $user['full_name'],
+        'email'     => (string) $user['email'],
+        'role'      => (string) $user['role'],
+        'pwf'       => password_fingerprint((string) $user['password_hash']),
+    ];
+}
+
+/**
  * Re-check the signed-in account against the database on every request. The session holds a copy of
  * the account (name, role), so without this a suspended user would stay signed in until their
  * session expired, and a role change would not apply until the next login.
@@ -493,6 +568,15 @@ function refresh_session_user(): void
         if ($suspended) {
             flash('error', 'This account has been suspended. Please contact the Kopii team if you think that is a mistake.');
         }
+        return;
+    }
+
+    // The password changed since this session was opened (or the session predates this check).
+    $stored = (string) ($_SESSION['user']['pwf'] ?? '');
+    if ($stored === '' || !hash_equals(password_fingerprint((string) $row['password_hash']), $stored)) {
+        unset($_SESSION['user']);
+        session_regenerate_id(true);
+        flash('warning', 'Please sign in again.');
         return;
     }
 

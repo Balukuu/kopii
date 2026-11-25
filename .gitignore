@@ -1,0 +1,19 @@
+# Live configuration: database password, mail settings. Never commit it.
+/app/config/env.php
+
+# Runtime data. The local SQLite demo database (with documented demo passwords), its schema
+# marker, the local mail log and the installer lock are all created on first run.
+/storage/*
+!/storage/.htaccess
+
+# Photos people upload. The bundled sample images in uploads/seed stay in the repo.
+/uploads/*
+!/uploads/.htaccess
+!/uploads/seed/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
