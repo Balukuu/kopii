@@ -1129,6 +1129,30 @@
     });
   };
 
+  // Admin listing page: choosing a plan fills in the end date that plan's length suggests (the free
+  // plan has none, so the date is cleared and locked). The date can still be changed by hand.
+  const initPlanForm = () => {
+    document.querySelectorAll('[data-plan-form]').forEach((form) => {
+      const select = form.querySelector('[data-plan-select]');
+      const date = form.querySelector('[data-plan-date]');
+      if (!select || !date) return;
+
+      const apply = (fromUser) => {
+        const option = select.options[select.selectedIndex];
+        const free = option.getAttribute('data-free') === '1';
+        date.disabled = free;
+        if (free) {
+          date.value = '';
+        } else if (fromUser) {
+          date.value = option.getAttribute('data-end') || '';
+        }
+      };
+
+      select.addEventListener('change', () => apply(true));
+      apply(false);
+    });
+  };
+
   initNavbar();
   initHeroSpotlight();
   initVerticalTabs();
@@ -1140,4 +1164,5 @@
   initShortlist();
   initConfirmForms();
   initDeferredValidation();
+  initPlanForm();
 })();

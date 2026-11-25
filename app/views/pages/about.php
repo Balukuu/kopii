@@ -13,7 +13,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
 
 <section class="hero">
     <div class="container">
-        <h1>A free showcase for Ugandan creatives and businesses</h1>
+        <h1>A showcase for Ugandan creatives and businesses</h1>
         <p class="hero-lead">
             Kopii is where you find a real, verified provider for the work you need, from home repairs and solar to weddings, design and photography. We introduce you, then step aside: you talk on WhatsApp or by phone and agree the deal yourselves.
         </p>
@@ -49,8 +49,8 @@ defined('KOPII_APP') or exit('Direct access denied.');
             </div>
             <div class="value-cell">
                 <div class="value-icon"><?= svg_icon('whatsapp', 24) ?></div>
-                <h3>No commission</h3>
-                <p>Kopii never taxes local creators or inflates client quotes. Dispatch structured briefs into a studio's inbox or connect immediately via WhatsApp and phone.</p>
+                <h3>Direct contact</h3>
+                <p>Kopii does not mark up quotes. Send a structured brief to a studio's inbox, or connect straight away on WhatsApp or by phone.</p>
             </div>
         </div>
 
@@ -64,8 +64,8 @@ defined('KOPII_APP') or exit('Direct access denied.');
                 <strong class="tnum"><?= (int) ($stats['portfolios'] ?? 0) ?>+</strong>
             </div>
             <div class="kpi-card">
-                <span>Marketplace Commission</span>
-                <strong>0%</strong>
+                <span>Cost to contact a provider</span>
+                <strong>Free</strong>
             </div>
             <div class="kpi-card">
                 <span>Local Currency Standard</span>

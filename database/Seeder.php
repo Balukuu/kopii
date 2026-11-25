@@ -102,6 +102,7 @@ class Seeder
         ]);
 
         self::seedProductCategories($pdo);
+        self::seedPlansAndFees($pdo);
 
         if (!$includeDemoListings) {
             self::markUsersVerified($pdo);
@@ -507,6 +508,37 @@ class Seeder
         $categories = require KOPII_ROOT . '/app/config/product_categories.php';
         foreach ($categories as [$name, $slug, $icon, $sort]) {
             $stmt->execute([':name' => $name, ':slug' => $slug, ':icon' => $icon, ':sort' => $sort]);
+        }
+    }
+
+    /**
+     * The free default plan every listing falls back to, and the default commission rates. Each is
+     * only added when missing, so anything an administrator has changed is left alone. The rates are
+     * the starting point agreed for launch (10%); keep them in step with FeeModel::DEFAULT_RATE.
+     */
+    public static function seedPlansAndFees(PDO $pdo): void
+    {
+        $now = date('Y-m-d H:i:s');
+
+        if ((int) $pdo->query('SELECT COUNT(*) FROM plans WHERE is_default = 1')->fetchColumn() === 0) {
+            $pdo->prepare(
+                'INSERT INTO plans (name, description, price_ugx, period_months, product_limit, is_default, is_active, sort_order, created_at, updated_at)
+                 VALUES (:name, :desc, 0, 0, NULL, 1, 1, 0, :now1, :now2)'
+            )->execute([
+                ':name'  => 'Basic',
+                ':desc'  => 'Free listing with your portfolio, packages and shop.',
+                ':now1'  => $now,
+                ':now2'  => $now,
+            ]);
+        }
+
+        $exists = $pdo->prepare('SELECT COUNT(*) FROM platform_settings WHERE setting_key = :k');
+        $insert = $pdo->prepare('INSERT INTO platform_settings (setting_key, setting_value, updated_at) VALUES (:k, :v, :u)');
+        foreach (['service_commission_pct', 'product_commission_pct'] as $key) {
+            $exists->execute([':k' => $key]);
+            if ((int) $exists->fetchColumn() === 0) {
+                $insert->execute([':k' => $key, ':v' => '10', ':u' => $now]);
+            }
         }
     }
 

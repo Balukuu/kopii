@@ -1,6 +1,6 @@
 <?php
 defined('KOPII_APP') or exit('Direct access denied.');
-/** @var string $adminTab overview | providers | products | opportunities | reviews | inbox | users | categories | activity */
+/** @var string $adminTab overview | providers | products | opportunities | reviews | inbox | users | plans | categories | activity */
 
 $counts = admin_attention_counts();
 $tabs = [
@@ -11,6 +11,7 @@ $tabs = [
     'reviews'   => ['/admin/reviews', 'Reviews', (int) $counts['pending_reviews']],
     'inbox'     => ['/admin/inbox', 'Inbox', (int) ($counts['open_messages'] ?? 0)],
     'users'     => ['/admin/users', 'Users', 0],
+    'plans'     => ['/admin/plans', 'Plans & fees', 0],
     'categories' => ['/admin/categories', 'Categories', 0],
     'activity'  => ['/admin/activity', 'Activity', 0],
 ];

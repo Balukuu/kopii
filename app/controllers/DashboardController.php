@@ -98,6 +98,9 @@ class DashboardController
             'productConditions' => $uganda['product_conditions'],
             'stockStatuses' => $uganda['stock_statuses'],
             'maxImages'     => ProductModel::MAX_IMAGES,
+            'plan'          => PlanModel::effective($provider),
+            'productLimit'  => PlanModel::productLimit($provider),
+            'featuredNow'   => ProviderModel::isFeaturedNow($provider),
             'newProposals'  => OpportunityModel::newResponseCount((int) $user['id']),
         ]);
     }

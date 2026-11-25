@@ -5,13 +5,17 @@ defined('KOPII_APP') or exit('Direct access denied.');
  * @var array $portfolio portfolio_items rows
  * @var array $packages  service_packages rows
  * @var array $history   admin_log rows about this listing
+ * @var array $planNow    PlanModel::effective(): the plan it is on today (+ expires_on, lapsed_from)
+ * @var array $planChoices plans an administrator can give it
  */
 View::partial('admin_header', ['adminTab' => $adminTab]);
 
 $id          = (int) $provider['id'];
 $status      = (string) $provider['status'];
 $isVerified  = !empty($provider['is_verified']);
-$isFeatured  = !empty($provider['is_featured']);
+$isFeatured  = ProviderModel::isFeaturedNow($provider);
+$onFeatured  = !empty($provider['is_featured']);                       // switched on, even if its end date has passed
+$featUntil   = trim((string) ($provider['featured_until'] ?? ''));
 $phoneOk     = strlen(normalize_ug_phone((string) $provider['phone'])) === 12;
 $hasPricing  = (int) $provider['starting_price_ugx'] > 0 || !empty($packages);
 $website     = trim((string) ($provider['website'] ?? ''));
@@ -38,7 +42,10 @@ $formBase    = static function (string $action) use ($id): string {
                             <span class="badge badge-type">Not verified</span>
                         <?php endif; ?>
                         <?php if ($isFeatured): ?>
-                            <span class="badge badge-featured">Featured</span>
+                            <span class="badge badge-featured">Featured<?= $featUntil !== '' ? ' until ' . e(date('j M Y', (int) strtotime($featUntil))) : '' ?></span>
+                        <?php endif; ?>
+                        <?php if (empty($planNow['is_default'])): ?>
+                            <span class="badge badge-type"><?= e($planNow['name']) ?> plan</span>
                         <?php endif; ?>
                     </div>
                     <h2 id="listing-title"><?= e($provider['business_name']) ?></h2>
@@ -178,11 +185,80 @@ $formBase    = static function (string $action) use ($id): string {
                             <div><button type="submit" class="btn btn-danger-outline btn-sm">Pause listing</button></div>
                         </form>
                     <?php endif; ?>
+                </section>
 
-                    <form method="POST" action="<?= e($moderateUrl) ?>" class="form-stack">
-                        <?= $formBase($isFeatured ? 'unfeature' : 'feature') ?>
-                        <div><button type="submit" class="btn btn-outline btn-sm"><?= $isFeatured ? 'Remove from Featured' : 'Feature on the home page' ?></button></div>
+                <section class="admin-card" aria-labelledby="plan-title">
+                    <h2 id="plan-title">Plan and featuring</h2>
+
+                    <p>
+                        On the <strong><?= e($planNow['name']) ?></strong> plan<?= !empty($planNow['expires_on']) ? ', until ' . e(date('j M Y', (int) strtotime((string) $planNow['expires_on']))) : '' ?>.
+                        <?php if (!empty($planNow['lapsed_from'])): ?>
+                            Its <?= e($planNow['lapsed_from']) ?> plan ended on <?= e(date('j M Y', (int) strtotime((string) $planNow['expires_on']))) ?>, so it is back on the free plan.
+                        <?php endif; ?>
+                        <?php if (PlanModel::productLimit($provider) !== ProductModel::MAX_PER_PROVIDER): ?>
+                            It may list up to <?= (int) PlanModel::productLimit($provider) ?> shop products.
+                        <?php endif; ?>
+                    </p>
+
+                    <form method="POST" action="<?= e(route_url('/admin/providers/plan')) ?>" class="form-stack" data-plan-form>
+                        <?= csrf_field() ?><?= admin_return_field() ?>
+                        <input type="hidden" name="provider_id" value="<?= $id ?>">
+                        <div class="field">
+                            <label for="plan-choice">Plan</label>
+                            <select id="plan-choice" name="plan_id" data-plan-select>
+                                <?php foreach ($planChoices as $pc): ?>
+                                    <?php
+                                    $isFreePlan = !empty($pc['is_default']);
+                                    $pcLabel = $pc['name'] . ($isFreePlan ? ' (free)' : ' (' . ((int) $pc['price_ugx'] > 0 ? 'UGX ' . number_format((int) $pc['price_ugx']) : 'free') . ' for ' . (int) $pc['period_months'] . ' ' . ((int) $pc['period_months'] === 1 ? 'month' : 'months') . ')') . (empty($pc['is_active']) ? ' - retired' : '');
+                                    ?>
+                                    <option value="<?= (int) $pc['id'] ?>"
+                                            data-end="<?= $isFreePlan ? '' : e(PlanModel::endDateFor($pc)) ?>"
+                                            data-free="<?= $isFreePlan ? '1' : '0' ?>"<?= (int) $pc['id'] === (int) $planNow['id'] ? ' selected' : '' ?>><?= e($pcLabel) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="plan-ends">Ends on</label>
+                            <input type="date" id="plan-ends" name="plan_expires_on" value="<?= e((string) ($planNow['expires_on'] ?? '')) ?>" data-plan-date>
+                            <span class="hint">Leave empty to use the length the plan covers, counted from today. Ignored for the free plan.</span>
+                        </div>
+                        <div class="field">
+                            <label for="plan-note">Payment reference (optional)</label>
+                            <input type="text" id="plan-note" name="note" maxlength="500" placeholder="Mobile Money transaction ID, or a note">
+                            <span class="hint">Kept in the activity log. The owner is emailed the new plan.</span>
+                        </div>
+                        <div><button type="submit" class="btn btn-primary btn-sm">Save plan</button></div>
                     </form>
+
+                    <p style="margin-block-start:var(--space-5);"><strong>Featured placement</strong></p>
+                    <p>
+                        Featured listings rank first in search and in the home page spotlight.
+                        <?php if ($isFeatured): ?>
+                            This one is Featured<?= $featUntil !== '' ? ' until ' . e(date('j M Y', (int) strtotime($featUntil))) : ', with no end date' ?>.
+                        <?php elseif ($onFeatured && $featUntil !== ''): ?>
+                            Its Featured spot ended on <?= e(date('j M Y', (int) strtotime($featUntil))) ?>.
+                        <?php else: ?>
+                            This one is not Featured.
+                        <?php endif; ?>
+                    </p>
+                    <form method="POST" action="<?= e($moderateUrl) ?>" class="form-stack">
+                        <?= $formBase('feature_until') ?>
+                        <div class="field">
+                            <label for="feat-until">Last day of the Featured spot</label>
+                            <input type="date" id="feat-until" name="featured_until" value="<?= e($featUntil) ?>" min="<?= e(date('Y-m-d')) ?>" required>
+                        </div>
+                        <div><button type="submit" class="btn btn-outline btn-sm">Feature until this date</button></div>
+                    </form>
+                    <form method="POST" action="<?= e($moderateUrl) ?>" class="form-stack">
+                        <?= $formBase('feature') ?>
+                        <div><button type="submit" class="btn btn-outline btn-sm">Feature with no end date</button></div>
+                    </form>
+                    <?php if ($onFeatured): ?>
+                        <form method="POST" action="<?= e($moderateUrl) ?>" class="form-stack">
+                            <?= $formBase('unfeature') ?>
+                            <div><button type="submit" class="btn btn-danger-outline btn-sm">Remove from Featured</button></div>
+                        </form>
+                    <?php endif; ?>
                 </section>
 
                 <section class="admin-card" aria-labelledby="owner-title">

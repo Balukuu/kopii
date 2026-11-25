@@ -77,6 +77,23 @@ Anyone can list for free and goes live immediately; the **Verified** badge is a 
 
 If you change the process, update the wording in `app/views/pages/home.php` (the "Verified Badge" section), `app/views/pages/about.php`, and `app/views/auth/register.php`. Testimonials on the home page come from `app/config/testimonials.php` (empty until you add real, permissioned quotes).
 
+## Plans, fees and Featured
+
+Admin console, **Plans & fees** (`/admin/plans`). Kopii does **not** take payment through the site yet, so this is a manual workflow:
+
+1. A business pays you by Mobile Money (outside the site).
+2. Open its listing in `/admin/providers/{id}`, card **Plan and featuring**: choose the plan, leave the end date empty to use the plan's length (counted from today) or type one, and put the Mobile Money reference in the note. Saving emails the owner and writes the reference to the Activity log.
+3. When the end date passes the listing falls back to the free default plan by itself. Nothing is deleted, and the provider's dashboard says the plan ended.
+
+What the pieces do:
+
+- **Plans** (`plans` table). The default plan (*Basic*, free) always exists and cannot be retired or priced. A paid plan has a price (0 is allowed, for a free founding-member period), the months that price covers, and an optional product limit. A plan with no limit uses the site-wide limit (`ProductModel::MAX_PER_PROVIDER`, 100); the limit is enforced when a provider adds a shop product. A retired plan cannot be given to more listings; listings already on it keep it until their end date.
+- **Featured until a date** (`providers.featured_until`). Featured listings rank first in search and in the home spotlight and carry a visible "Featured" label. With an end date the spot ends by itself; with none it stays until removed (the old behaviour).
+- **Commission rates** (`platform_settings`). Two numbers, services and products, both **10% by default**, edited on the same page. **They are stored for the booking flow and are not charged or shown to visitors.** `FeeModel::commissionFor($amount, 'service'|'product')` is the one place the arithmetic lives, ready for when bookings and checkout are paid through Kopii.
+- **Wording.** Public pages must not quote a commission or promise "no commission" while the model is undecided: say "free to browse and contact" and "free to list at launch", and keep `app/views/pages/terms.php` section 2 in step with what is really charged. Update the Terms date in `PageController::LEGAL_UPDATED` when you change it.
+
+Migrator version 6 adds `providers.featured_until`, `plan_id`, `plan_expires_on` and the two tables, and seeds the Basic plan and the two rates.
+
 ---
 
 ## Deploying to `kopii.online` (LiteSpeed / cPanel + MySQL)

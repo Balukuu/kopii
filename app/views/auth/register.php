@@ -12,7 +12,7 @@ $selectedType = old('provider_type', 'freelancer');
                         List your business on Kopii
                     </h1>
                     <p style="margin:0; font-size:0.95rem; color:var(--graphite-700);">
-                        Create a free profile with your portfolio and UGX prices. Clients contact you directly, and Kopii takes no commission.
+                        Create a free profile with your portfolio and UGX prices. Clients contact you directly.
                     </p>
                 </div>
 
@@ -264,8 +264,8 @@ $selectedType = old('provider_type', 'freelancer');
                     <li>
                         <?= svg_icon('check', 16) ?>
                         <div>
-                            <strong class="label-strong on-dark">0% Platform Commission</strong>
-                            <span class="on-dark-sm">Keep 100% of your quoted UGX project fee. Clients hire and pay you directly.</span>
+                            <strong class="label-strong on-dark">Free to list at launch</strong>
+                            <span class="on-dark-sm">Clients hire and pay you directly. If we ever add a fee, we will tell you in advance.</span>
                         </div>
                     </li>
                     <li>
@@ -293,7 +293,7 @@ $selectedType = old('provider_type', 'freelancer');
 
                 <div style="padding-block-start:1.35rem; border-block-start:1px solid rgba(255,255,255,0.16);">
                     <p style="margin:0; font-size:0.86rem; font-weight:300; color:#ebeced; line-height:1.6;">
-                        Listing is free and Kopii takes 0% commission. Clients reach you directly by quote request, WhatsApp, or phone.
+                        Listing is free while we launch. Clients reach you directly by quote request, WhatsApp, or phone.
                     </p>
                 </div>
             </aside>

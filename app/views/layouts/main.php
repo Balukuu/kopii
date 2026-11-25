@@ -6,7 +6,7 @@ $curRoute = $currentRoute ?? '/';
 
 // Page title, description and picture, as shown in search results and in WhatsApp / Facebook previews.
 $seoTitle       = (string) ($pageTitle ?? 'Kopii — Hire Talent & Studios in Uganda');
-$seoDescription = (string) ($metaDescription ?? 'Find a real, verified provider in Uganda for the work you need, from home repairs and solar to events, design and photography. See their past work and UGX prices, then talk on WhatsApp. Free, with no commission.');
+$seoDescription = (string) ($metaDescription ?? 'Find a real, verified provider in Uganda for the work you need, from home repairs and solar to events, design and photography. See their past work and UGX prices, then talk on WhatsApp. Free to browse and contact.');
 $seoImagePath   = (string) ($ogImage ?? 'assets/images/og-default.jpg');
 $seoImage       = site_origin() . asset_url($seoImagePath);
 $seoCanonical   = (string) ($canonicalUrl ?? canonical_url());
@@ -254,7 +254,7 @@ $seoNoindex     = !empty($noindex) || request_is_private_area();
                 <div class="footer-legal">
                     <span>&copy; Copyright 2010 &ndash; <?= date('Y') ?> Kopii Online Uganda</span>
                     <span>&middot;</span>
-                    <span>0% Commission &middot; Transparent UGX Pricing</span>
+                    <span>Free to browse &middot; Transparent UGX Pricing</span>
                     <span>&middot;</span>
                     <a href="<?= e(route_url('/safety')) ?>">Safety tips</a>
                     <a href="<?= e(route_url('/terms')) ?>">Terms</a>

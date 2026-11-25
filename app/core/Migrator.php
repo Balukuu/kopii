@@ -13,7 +13,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
  */
 final class Migrator
 {
-    private const VERSION = 5;
+    private const VERSION = 6;
 
     public static function run(PDO $pdo): void
     {
@@ -177,6 +177,17 @@ final class Migrator
                 : 'ALTER TABLE `providers` ADD COLUMN `service_areas` VARCHAR(255) DEFAULT NULL');
         }
 
+        // v6: plans and fees. A listing can be on a plan (with an end date) and can be Featured until a
+        // date. `plans` and `platform_settings` are `CREATE TABLE IF NOT EXISTS` in the schema file
+        // (executed below); only the columns added to the existing providers table are spelled out here.
+        foreach (['featured_until' => ['TEXT', 'DATE'], 'plan_id' => ['INTEGER', 'INT UNSIGNED'], 'plan_expires_on' => ['TEXT', 'DATE']] as $column => [$sqliteType, $mysqlType]) {
+            if (!self::hasColumn($pdo, 'providers', $column)) {
+                $pdo->exec($sqlite
+                    ? 'ALTER TABLE providers ADD COLUMN ' . $column . ' ' . $sqliteType . ' DEFAULT NULL'
+                    : 'ALTER TABLE `providers` ADD COLUMN `' . $column . '` ' . $mysqlType . ' DEFAULT NULL');
+            }
+        }
+
         // v4: support_messages (the contact form and "report this listing"). Like v3's tables it is
         // `CREATE TABLE IF NOT EXISTS` in the schema file, which is executed below, so there is no
         // separate step for it here.
@@ -199,6 +210,7 @@ final class Migrator
         require_once KOPII_ROOT . '/database/Seeder.php';
         Seeder::seedProductCategories($pdo);
         Seeder::seedExtraServiceCategories($pdo);
+        Seeder::seedPlansAndFees($pdo);
 
         // A developer's own demo database gets sample products and opportunities so the new pages are
         // not empty. Never on a live site: it needs app_env = local, SQLite, and the seeded demo providers.

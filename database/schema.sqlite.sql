@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS providers (
     verified_at TEXT DEFAULT NULL,
     verified_by INTEGER DEFAULT NULL,
     is_featured INTEGER NOT NULL DEFAULT 0,
+    featured_until TEXT DEFAULT NULL,
+    plan_id INTEGER DEFAULT NULL,
+    plan_expires_on TEXT DEFAULT NULL,
     is_available INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'active',
     views_count INTEGER NOT NULL DEFAULT 0,
@@ -280,3 +283,29 @@ CREATE TABLE IF NOT EXISTS support_messages (
 
 CREATE INDEX IF NOT EXISTS idx_support_messages_status ON support_messages (status, created_at);
 CREATE INDEX IF NOT EXISTS idx_support_messages_target ON support_messages (target_type, target_id);
+
+-- Plans an administrator can put a listing on. The default plan (is_default = 1) is the free one every
+-- listing falls back to; it cannot be retired. A paid plan costs price_ugx for period_months, and
+-- product_limit is how many shop products a listing on it may have (NULL = the site-wide limit).
+-- Kopii does not take payment yet: an administrator records a payment received by hand, then assigns
+-- the plan to the listing (providers.plan_id, providers.plan_expires_on).
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    price_ugx INTEGER NOT NULL DEFAULT 0,
+    period_months INTEGER NOT NULL DEFAULT 0,
+    product_limit INTEGER DEFAULT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Site-wide numbers an administrator can change without editing files (the commission rates).
+CREATE TABLE IF NOT EXISTS platform_settings (
+    setting_key TEXT PRIMARY KEY,
+    setting_value TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);

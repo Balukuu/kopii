@@ -8,7 +8,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
 class PageController
 {
     /** Shown at the top of the Terms and the Privacy Policy. Change it whenever either text changes. */
-    private const LEGAL_UPDATED = '24 November 2026';
+    private const LEGAL_UPDATED = '25 November 2026';
 
     // ---------------------------------------------------------------------------------------
     // Terms, privacy, contact

@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS `providers` (
     `verified_at` DATETIME DEFAULT NULL,
     `verified_by` INT UNSIGNED DEFAULT NULL,
     `is_featured` TINYINT(1) NOT NULL DEFAULT 0,
+    `featured_until` DATE DEFAULT NULL,
+    `plan_id` INT UNSIGNED DEFAULT NULL,
+    `plan_expires_on` DATE DEFAULT NULL,
     `is_available` TINYINT(1) NOT NULL DEFAULT 1,
     `status` VARCHAR(20) NOT NULL DEFAULT 'active',
     `views_count` INT UNSIGNED NOT NULL DEFAULT 0,
@@ -309,6 +312,35 @@ CREATE TABLE IF NOT EXISTS `support_messages` (
     KEY `idx_support_messages_status` (`status`, `created_at`),
     KEY `idx_support_messages_target` (`target_type`, `target_id`),
     CONSTRAINT `fk_support_messages_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Plans an administrator can put a listing on. The default plan (is_default = 1) is the free one every
+-- listing falls back to; it cannot be retired. A paid plan costs price_ugx for period_months, and
+-- product_limit is how many shop products a listing on it may have (NULL = the site-wide limit).
+-- Kopii does not take payment yet: an administrator records a payment received by hand, then assigns
+-- the plan to the listing (providers.plan_id, providers.plan_expires_on).
+CREATE TABLE IF NOT EXISTS `plans` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(60) NOT NULL,
+    `description` VARCHAR(255) NOT NULL DEFAULT '',
+    `price_ugx` INT UNSIGNED NOT NULL DEFAULT 0,
+    `period_months` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `product_limit` INT UNSIGNED DEFAULT NULL,
+    `is_default` TINYINT(1) NOT NULL DEFAULT 0,
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `sort_order` INT NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL,
+    `updated_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_plans_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Site-wide numbers an administrator can change without editing files (the commission rates).
+CREATE TABLE IF NOT EXISTS `platform_settings` (
+    `setting_key` VARCHAR(60) NOT NULL,
+    `setting_value` VARCHAR(255) NOT NULL DEFAULT '',
+    `updated_at` DATETIME NOT NULL,
+    PRIMARY KEY (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

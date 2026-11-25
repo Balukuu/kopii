@@ -333,7 +333,7 @@ $authUser  = current_user();
 
             <div class="risk-free-box">
                 <?= svg_icon('shield', 20) ?>
-                <span><strong>Before you pay:</strong> ask for photos of past work, agree the scope and price in writing (WhatsApp counts), and never pay in full upfront. Kopii takes no commission and no payment. <a href="<?= e(route_url('/safety')) ?>">Read the safety tips</a>.</span>
+                <span><strong>Before you pay:</strong> ask for photos of past work, agree the scope and price in writing (WhatsApp counts), and never pay in full upfront. Kopii does not currently take or hold payments for jobs. <a href="<?= e(route_url('/safety')) ?>">Read the safety tips</a>.</span>
             </div>
 
             <dl class="facts">

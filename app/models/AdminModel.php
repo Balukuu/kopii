@@ -151,7 +151,7 @@ final class AdminModel
         }
 
         if ((string) ($f['featured'] ?? '') === '1') {
-            $where[] = 'p.is_featured = 1';
+            $where[] = ProviderModel::featuredSql();
         }
 
         // Thin listings (fewer than 3 photos of work) are where fake or low-effort profiles hide.

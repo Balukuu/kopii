@@ -47,7 +47,7 @@ class ProviderModel
         }
 
         if (!empty($filters['featured'])) {
-            $where[] = 'p.is_featured = 1';
+            $where[] = self::featuredSql();
         }
 
         if (!empty($filters['ids']) && is_array($filters['ids'])) {
@@ -66,12 +66,13 @@ class ProviderModel
         $whereSql = implode(' AND ', $where);
 
         $sort = (string) ($filters['sort'] ?? 'featured');
+        $featuredFirst = 'CASE WHEN ' . self::featuredSql() . ' THEN 1 ELSE 0 END DESC';
         $orderBy = match ($sort) {
             'rating'    => 'avg_rating DESC, review_count DESC, p.is_verified DESC',
             'price_asc' => 'CASE WHEN p.starting_price_ugx = 0 THEN 1 ELSE 0 END ASC, p.starting_price_ugx ASC',
-            'work'      => 'portfolio_count DESC, p.is_featured DESC',
+            'work'      => 'portfolio_count DESC, ' . $featuredFirst,
             'newest'    => 'p.id DESC',
-            default     => 'p.is_featured DESC, p.is_verified DESC, avg_rating DESC, portfolio_count DESC, p.id DESC',
+            default     => $featuredFirst . ', p.is_verified DESC, avg_rating DESC, portfolio_count DESC, p.id DESC',
         };
 
         $sql = "
@@ -756,10 +757,40 @@ class ProviderModel
         ]);
     }
 
-    public static function adminSetFeatured(int $providerId, bool $featured): void
+    /**
+     * Feature a listing (optionally only until a date, inclusive) or take it off Featured.
+     * Featuring with no date has no end; un-featuring always clears the date.
+     */
+    public static function adminSetFeatured(int $providerId, bool $featured, ?string $until = null): void
     {
-        $stmt = Database::connection()->prepare('UPDATE providers SET is_featured = :f, updated_at = :u WHERE id = :id');
-        $stmt->execute([':f' => $featured ? 1 : 0, ':u' => date('Y-m-d H:i:s'), ':id' => $providerId]);
+        $stmt = Database::connection()->prepare(
+            'UPDATE providers SET is_featured = :f, featured_until = :until, updated_at = :u WHERE id = :id'
+        );
+        $stmt->execute([
+            ':f'     => $featured ? 1 : 0,
+            ':until' => $featured ? $until : null,
+            ':u'     => date('Y-m-d H:i:s'),
+            ':id'    => $providerId,
+        ]);
+    }
+
+    /**
+     * SQL that is true for a listing that is Featured right now: switched on, and not past its end date.
+     * The date is written straight into the SQL; it comes from date(), never from a visitor.
+     */
+    public static function featuredSql(string $alias = 'p'): string
+    {
+        return '(' . $alias . ".is_featured = 1 AND (" . $alias . ".featured_until IS NULL OR " . $alias . ".featured_until >= '" . date('Y-m-d') . "'))";
+    }
+
+    /** The same test for a row already loaded (an admin page, a card). */
+    public static function isFeaturedNow(array $provider): bool
+    {
+        if (empty($provider['is_featured'])) {
+            return false;
+        }
+        $until = trim((string) ($provider['featured_until'] ?? ''));
+        return $until === '' || $until >= date('Y-m-d');
     }
 
     /**

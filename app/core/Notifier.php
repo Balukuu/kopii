@@ -146,6 +146,27 @@ final class Notifier
         }
     }
 
+    /** Tell a listing's owner their plan changed. $until is a Y-m-d end date, or null for no end date. */
+    public static function listingPlanChanged(array $provider, string $planName, ?string $until): void
+    {
+        try {
+            $lines = [
+                'Hi ' . self::firstName((string) ($provider['owner_name'] ?? '')) . ',',
+                '',
+                $provider['business_name'] . ' is now on the ' . $planName . ' plan on Kopii' . ($until !== null ? ', until ' . date('j F Y', (int) strtotime($until)) . '.' : '.'),
+            ];
+            if ($until !== null) {
+                $lines[] = 'After that date your listing returns to the free plan. Nothing is deleted.';
+            }
+            $lines[] = '';
+            $lines[] = 'You can see your plan on your dashboard: ' . absolute_url('/dashboard');
+            $lines[] = 'If this is not what you expected, reply to this email or write to us at ' . absolute_url('/contact');
+            Mailer::send((string) $provider['owner_email'], 'Your Kopii plan: ' . $planName, implode("\n", $lines));
+        } catch (Throwable $e) {
+            error_log('[Kopii] plan email failed: ' . $e->getMessage());
+        }
+    }
+
     public static function listingPaused(array $provider, string $reason): void
     {
         try {

@@ -36,8 +36,9 @@ class SellerController
         if ($existing + count($files) > ProductModel::MAX_IMAGES) {
             $problems[] = 'A product can have at most ' . ProductModel::MAX_IMAGES . ' photos.';
         }
-        if ($product === null && ProductModel::countForProvider($providerId) >= ProductModel::MAX_PER_PROVIDER) {
-            $problems[] = 'You have reached the limit of ' . ProductModel::MAX_PER_PROVIDER . ' products. Remove one to add another.';
+        $productLimit = PlanModel::productLimit($provider);
+        if ($product === null && ProductModel::countForProvider($providerId) >= $productLimit) {
+            $problems[] = 'Your ' . PlanModel::effective($provider)['name'] . ' plan allows ' . $productLimit . ' products. Remove one to add another, or ask the Kopii team about a bigger plan on the Contact page.';
         }
 
         if (!empty($problems)) {

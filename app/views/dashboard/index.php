@@ -109,6 +109,24 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                     </div>
 
                     <div class="content-panel">
+                        <h2>Your plan: <?= e($plan['name']) ?></h2>
+                        <?php if (!empty($plan['lapsed_from'])): ?>
+                            <p class="text-muted" style="margin-block-start:0;">Your <?= e($plan['lapsed_from']) ?> plan ended on <?= e(date('j M Y', (int) strtotime((string) $plan['expires_on']))) ?>, so your listing is back on the free <?= e($plan['name']) ?> plan. Nothing was deleted.</p>
+                        <?php elseif (!empty($plan['expires_on'])): ?>
+                            <p class="text-muted" style="margin-block-start:0;">Active until <?= e(date('j M Y', (int) strtotime((string) $plan['expires_on']))) ?>. After that your listing returns to the free plan and nothing is deleted.</p>
+                        <?php else: ?>
+                            <p class="text-muted" style="margin-block-start:0;"><?= e($plan['name']) ?> is free.</p>
+                        <?php endif; ?>
+                        <ul class="deliverables-list">
+                            <li><?= svg_icon('check', 16) ?> <span>Up to <?= (int) $productLimit ?> shop products</span></li>
+                            <?php if ($featuredNow): ?>
+                                <li><?= svg_icon('check', 16) ?> <span>Featured<?= !empty($provider['featured_until']) ? ' until ' . e(date('j M Y', (int) strtotime((string) $provider['featured_until']))) : '' ?>: you rank first in search</span></li>
+                            <?php endif; ?>
+                        </ul>
+                        <p class="hint m-0">To change your plan or ask about a Featured spot, <a href="<?= e(route_url('/contact')) ?>">contact the Kopii team</a>.</p>
+                    </div>
+
+                    <div class="content-panel">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-block-end:1rem;">
                             <h2 class="m-0">Recent Client Inquiries</h2>
                             <a href="<?= e(route_url('/dashboard', ['tab' => 'inquiries'])) ?>" class="btn btn-outline btn-sm">Open Full Inbox</a>
@@ -434,6 +452,7 @@ $publicUrl = route_url('/provider/' . $provider['slug']);
                             <h2 class="m-0">Your shop products (<?= count($products) ?>)</h2>
                             <a href="<?= e(route_url('/shop')) ?>" class="btn btn-outline btn-sm"><?= svg_icon('globe', 16) ?> View the shop</a>
                         </div>
+                        <p class="hint" style="margin-block-start:0;">Your <?= e($plan['name']) ?> plan allows up to <?= (int) $productLimit ?> products.</p>
                         <?php if (empty($products)): ?>
                             <p class="text-muted m-0">List what you sell: photos, a price in UGX and a short description. Buyers message you straight from the product page, and their messages land in your Client Leads inbox.</p>
                         <?php else: ?>

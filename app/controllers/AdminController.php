@@ -110,6 +110,8 @@ class AdminController
             'portfolio'    => ProviderModel::getPortfolio($id),
             'packages'     => ProviderModel::getPackages($id),
             'history'      => AdminLogModel::recent(15, 0, 'provider', $id),
+            'planNow'      => PlanModel::effective($provider),
+            'planChoices'  => PlanModel::assignable((int) ($provider['plan_id'] ?? 0)),
         ]);
     }
 
@@ -157,14 +159,38 @@ class AdminController
                 break;
 
             case 'feature':
-            case 'unfeature':
-                $want = $action === 'feature';
-                if ((bool) $provider['is_featured'] === $want) {
-                    flash('success', $label . ($want ? ' is already Featured.' : ' is not Featured.'));
+                // No end date: Featured until an administrator takes it off.
+                if (!empty($provider['is_featured']) && trim((string) ($provider['featured_until'] ?? '')) === '') {
+                    flash('success', $label . ' is already Featured, with no end date.');
                 } else {
-                    ProviderModel::adminSetFeatured($id, $want);
-                    AdminLogModel::record($want ? 'provider.feature' : 'provider.unfeature', 'provider', $id, $label, $note);
-                    flash('success', $want ? $label . ' is now Featured.' : $label . ' is no longer Featured.');
+                    ProviderModel::adminSetFeatured($id, true, null);
+                    AdminLogModel::record('provider.feature', 'provider', $id, $label, trim('No end date. ' . $note));
+                    flash('success', $label . ' is now Featured, with no end date.');
+                }
+                break;
+
+            case 'feature_until':
+                $until = PlanModel::parseDate((string) ($_POST['featured_until'] ?? ''));
+                if ($until === null) {
+                    flash('error', 'Pick the last day of the Featured spot as a date.');
+                } elseif ($until < date('Y-m-d') || $until > date('Y-m-d', strtotime('+3 years'))) {
+                    flash('error', 'The end date must be today or later, and within the next 3 years.');
+                } elseif (!empty($provider['is_featured']) && (string) ($provider['featured_until'] ?? '') === $until) {
+                    flash('success', $label . ' is already Featured until ' . date('j M Y', strtotime($until)) . '.');
+                } else {
+                    ProviderModel::adminSetFeatured($id, true, $until);
+                    AdminLogModel::record('provider.feature', 'provider', $id, $label, trim('Until ' . $until . '. ' . $note));
+                    flash('success', $label . ' is Featured until ' . date('j M Y', strtotime($until)) . '.');
+                }
+                break;
+
+            case 'unfeature':
+                if (empty($provider['is_featured'])) {
+                    flash('success', $label . ' is not Featured.');
+                } else {
+                    ProviderModel::adminSetFeatured($id, false);
+                    AdminLogModel::record('provider.unfeature', 'provider', $id, $label, $note);
+                    flash('success', $label . ' is no longer Featured.');
                 }
                 break;
 
@@ -197,6 +223,82 @@ class AdminController
         }
 
         admin_redirect_back('/admin/providers/' . $id);
+    }
+
+    /**
+     * Put a listing on a plan until a date, or back on the default plan. Kopii does not take payment
+     * itself yet: the administrator has already received it (for example by Mobile Money) and writes
+     * the reference in the note, which goes into the audit log.
+     */
+    public function assignPlan(): void
+    {
+        require_admin();
+        verify_csrf();
+
+        $id       = (int) ($_POST['provider_id'] ?? 0);
+        $provider = $id > 0 ? AdminModel::providerDetail($id) : null;
+        if ($provider === null) {
+            flash('error', 'That listing no longer exists.');
+            admin_redirect_back('/admin/providers');
+        }
+
+        $back    = '/admin/providers/' . $id . '#plan-title';
+        $note    = $this->note($back);
+        $label   = (string) $provider['business_name'];
+        $default = PlanModel::defaultPlan();
+        $planId  = (int) ($_POST['plan_id'] ?? 0);
+        $current = PlanModel::effective($provider);
+
+        // Back to the free plan.
+        if ($planId <= 0 || $planId === (int) $default['id']) {
+            if ((int) ($provider['plan_id'] ?? 0) === 0) {
+                flash('success', $label . ' is already on the ' . $default['name'] . ' plan.');
+            } else {
+                PlanModel::assign($id, null, null);
+                AdminLogModel::record('provider.plan', 'provider', $id, $label, trim('Back to ' . $default['name'] . '. ' . $note));
+                Notifier::listingPlanChanged($provider, (string) $default['name'], null);
+                flash('success', $label . ' is back on the ' . $default['name'] . ' plan, and the owner has been emailed.');
+            }
+            admin_redirect_back($back);
+        }
+
+        $plan = PlanModel::find($planId);
+        if ($plan === null) {
+            flash('error', 'That plan no longer exists.');
+            admin_redirect_back($back);
+        }
+        if (empty($plan['is_active']) && (int) ($provider['plan_id'] ?? 0) !== $planId) {
+            flash('error', '"' . $plan['name'] . '" has been retired, so it cannot be given to more listings.');
+            admin_redirect_back($back);
+        }
+
+        // An empty end date means "the length the plan covers, from today", never "for ever": a paid
+        // plan with no end would quietly stay on after the payment ran out.
+        $endsText = trim((string) ($_POST['plan_expires_on'] ?? ''));
+        if ($endsText === '') {
+            $ends = PlanModel::endDateFor($plan);
+        } else {
+            $ends = PlanModel::parseDate($endsText);
+            if ($ends === null) {
+                flash('error', 'Enter the end date as a calendar date, or leave it empty to use the length the plan covers.');
+                admin_redirect_back($back);
+            }
+            if ($ends < date('Y-m-d') || $ends > date('Y-m-d', strtotime('+5 years'))) {
+                flash('error', 'The end date must be today or later, and within the next 5 years.');
+                admin_redirect_back($back);
+            }
+        }
+
+        if ((int) ($provider['plan_id'] ?? 0) === $planId && (string) ($provider['plan_expires_on'] ?? '') === $ends && $current['lapsed_from'] === null) {
+            flash('success', $label . ' is already on the ' . $plan['name'] . ' plan with that end date.');
+            admin_redirect_back($back);
+        }
+
+        PlanModel::assign($id, $planId, $ends);
+        AdminLogModel::record('provider.plan', 'provider', $id, $label, trim('Plan: ' . $plan['name'] . ' until ' . $ends . '. ' . $note));
+        Notifier::listingPlanChanged($provider, (string) $plan['name'], $ends);
+        flash('success', $label . ' is on the ' . $plan['name'] . ' plan until ' . date('j M Y', strtotime($ends)) . ', and the owner has been emailed.');
+        admin_redirect_back($back);
     }
 
     // ---------------------------------------------------------------------------------------
@@ -649,6 +751,118 @@ class AdminController
             flash('error', report_exception($e, 'We could not delete that category. Please try again.'));
         }
         admin_redirect_back($back);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Plans and fees
+    // ---------------------------------------------------------------------------------------
+
+    public function plans(): void
+    {
+        require_admin();
+
+        $plans   = PlanModel::all();
+        $editing = null;
+        if (ctype_digit((string) ($_GET['edit'] ?? ''))) {
+            $editing = PlanModel::find((int) $_GET['edit']);
+        }
+
+        View::render('admin/plans', [
+            'pageTitle'    => 'Plans & fees — Admin — Kopii',
+            'currentRoute' => '/admin/plans',
+            'adminTab'     => 'plans',
+            'plans'        => $plans,
+            'editing'      => $editing,
+            'rates'        => FeeModel::rates(),
+            'renewals'     => PlanModel::listingsOnPaidPlans(),
+            'siteLimit'    => ProductModel::MAX_PER_PROVIDER,
+        ]);
+    }
+
+    /** Add a plan (no plan_id) or change one. The default plan keeps its price at 0 and cannot be retired. */
+    public function savePlan(): void
+    {
+        require_admin();
+        verify_csrf();
+
+        $id       = (int) ($_POST['plan_id'] ?? 0);
+        $existing = $id > 0 ? PlanModel::find($id) : null;
+        if ($id > 0 && $existing === null) {
+            flash('error', 'That plan no longer exists.');
+            admin_redirect_back('/admin/plans');
+        }
+        $isDefault = $existing !== null && !empty($existing['is_default']);
+        $back      = $id > 0 ? '/admin/plans?edit=' . $id . '#plan-form' : '/admin/plans#plan-form';
+
+        [$data, $problems] = PlanModel::clean($_POST, $isDefault);
+        if ($data['name'] !== '' && PlanModel::nameTaken($data['name'], $id)) {
+            $problems[] = 'Another plan already has that name.';
+        }
+        if (!empty($problems)) {
+            flash('error', 'Nothing was saved. ' . implode(' ', $problems));
+            admin_redirect_back($back);
+        }
+
+        try {
+            if ($existing === null) {
+                $newId = PlanModel::create($data);
+                AdminLogModel::record('plan.create', 'plan', $newId, $data['name'], $this->planSummary($data));
+                flash('success', 'The plan "' . $data['name'] . '" was added.');
+            } else {
+                PlanModel::update($id, $data, $isDefault);
+                AdminLogModel::record('plan.update', 'plan', $id, $data['name'], $this->planSummary($data, $isDefault));
+                flash('success', 'The plan "' . $data['name'] . '" was saved. Listings already on it keep it until their end date.');
+            }
+        } catch (Throwable $e) {
+            flash('error', report_exception($e, 'We could not save that plan. Please try again.'));
+            admin_redirect_back($back);
+        }
+        admin_redirect_back('/admin/plans');
+    }
+
+    /** Set both commission rates. They are stored for the booking flow to use; nothing is charged yet. */
+    public function saveFees(): void
+    {
+        require_admin();
+        verify_csrf();
+
+        $service = FeeModel::parseRate((string) ($_POST['service_rate'] ?? ''));
+        $product = FeeModel::parseRate((string) ($_POST['product_rate'] ?? ''));
+        if ($service === null || $product === null) {
+            flash('error', 'Nothing was saved. Enter each rate as a percentage from 0 to ' . FeeModel::label(FeeModel::MAX_RATE) . ', for example 10 or 7.5.');
+            admin_redirect_back('/admin/plans#fees-title');
+        }
+
+        $before = FeeModel::rates();
+        if ($before[FeeModel::SERVICE] === $service && $before[FeeModel::PRODUCT] === $product) {
+            flash('success', 'Those are the rates already set.');
+            admin_redirect_back('/admin/plans#fees-title');
+        }
+
+        try {
+            FeeModel::saveRates($service, $product);
+            AdminLogModel::record(
+                'fees.update', 'setting', null, 'Commission rates',
+                'Services ' . FeeModel::label($before[FeeModel::SERVICE]) . ' to ' . FeeModel::label($service)
+                . '; products ' . FeeModel::label($before[FeeModel::PRODUCT]) . ' to ' . FeeModel::label($product) . '.'
+            );
+            flash('success', 'The commission rates were saved. Nothing is charged until the booking flow exists.');
+        } catch (Throwable $e) {
+            flash('error', report_exception($e, 'We could not save the rates. Please try again.'));
+        }
+        admin_redirect_back('/admin/plans#fees-title');
+    }
+
+    /** What was actually saved, in a line for the audit log. The default plan is always free and on sale. */
+    private function planSummary(array $d, bool $isDefault = false): string
+    {
+        if ($isDefault) {
+            $d['price_ugx'] = 0;
+            $d['is_active'] = 1;
+        }
+        $price = (int) $d['price_ugx'] > 0 ? 'UGX ' . number_format((int) $d['price_ugx']) . ' for ' . (int) $d['period_months'] . ' month(s)' : 'free';
+        $limit = $d['product_limit'] !== null ? $d['product_limit'] . ' products' : 'site-wide product limit';
+        return $price . '; ' . $limit . '; ' . ((int) $d['is_active'] === 1 ? 'on sale' : 'retired');
     }
 
     // ---------------------------------------------------------------------------------------

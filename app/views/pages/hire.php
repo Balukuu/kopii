@@ -342,7 +342,7 @@ $timelines = [
 
                     <div class="risk-free-box" style="margin-block-start:0.25rem;">
                         <?= svg_icon('shield', 20) ?>
-                        <span><strong>Zero-Commission Direct Hire:</strong> Free to inquire. Specialists reply directly to your WhatsApp, phone, or email with tailored UGX quotes.</span>
+                        <span><strong>Direct hire:</strong> Free to inquire. Specialists reply directly to your WhatsApp, phone, or email with tailored UGX quotes.</span>
                     </div>
                 </form>
             </aside>

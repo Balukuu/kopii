@@ -9,7 +9,7 @@ defined('KOPII_APP') or exit('Direct access denied.');
  */
 final class AdminLogModel
 {
-    public const TYPES = ['provider', 'product', 'opportunity', 'review', 'user', 'category', 'message'];
+    public const TYPES = ['provider', 'product', 'opportunity', 'review', 'user', 'category', 'message', 'plan', 'setting'];
 
     public static function record(string $action, string $targetType, ?int $targetId, string $label, string $note = ''): void
     {
@@ -33,7 +33,7 @@ final class AdminLogModel
     }
 
     /**
-     * @param string   $targetType '' for everything, otherwise provider | product | opportunity | review | user | category | message
+     * @param string   $targetType '' for everything, otherwise provider | product | opportunity | review | user | category | message | plan | setting
      * @param int|null $targetId   only entries about this one target
      */
     public static function recent(int $limit = 20, int $offset = 0, string $targetType = '', ?int $targetId = null): array
@@ -68,6 +68,10 @@ final class AdminLogModel
             'provider.unverify'  => 'Removed the Verified badge from ' . $label,
             'provider.feature'   => 'Featured ' . $label,
             'provider.unfeature' => 'Removed ' . $label . ' from Featured',
+            'provider.plan'      => 'Changed the plan of ' . $label,
+            'plan.create'        => 'Added the plan "' . $label . '"',
+            'plan.update'        => 'Edited the plan "' . $label . '"',
+            'fees.update'        => 'Changed the commission rates',
             'provider.pause'     => 'Paused ' . $label,
             'provider.activate'  => 'Reactivated ' . $label,
             'product.suspend'    => 'Hid the product ' . $label,

@@ -30,7 +30,7 @@ $contactLine = $supportEmail !== ''
             <p>Kopii is an online marketplace where people and businesses in Uganda list their services and products, post opportunities, and where customers find them and get in touch. Kopii is a place to meet. <strong>We are not a party to any deal</strong> between a customer and a provider, seller or poster, and we do not employ, represent or guarantee any of them.</p>
 
             <h2>2. Money and payments</h2>
-            <p>Kopii does not currently take payments, hold money or charge commission. Prices shown are set by providers and sellers. You agree price, delivery and payment directly with the other person. Take the usual care: confirm who you are dealing with, put the agreement in writing (a WhatsApp message counts), and avoid paying the full amount for something you have not seen or received.</p>
+            <p>Kopii does not currently take payments, hold money or charge commission. In future we may offer paid plans or featured placement to businesses, and charge a commission on bookings or orders that are paid through Kopii. If we do, we will say so on this page and by email before any fee applies to you. Prices shown are set by providers and sellers. You agree price, delivery and payment directly with the other person. Take the usual care: confirm who you are dealing with, put the agreement in writing (a WhatsApp message counts), and avoid paying the full amount for something you have not seen or received.</p>
 
             <h2>3. Your account</h2>
             <ul>

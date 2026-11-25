@@ -569,7 +569,7 @@ $worldDots = [
             <li class="how-step">
                 <span class="how-step-num tnum" aria-hidden="true">3</span>
                 <h3>Contact them directly</h3>
-                <p>Send one brief to up to five providers, or open WhatsApp. You agree the price with them, and Kopii takes no commission.</p>
+                <p>Send one brief to up to five providers, or open WhatsApp. You agree the price with them directly.</p>
             </li>
         </ol>
     </div>
